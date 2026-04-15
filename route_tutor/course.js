@@ -459,4 +459,50 @@ router.delete("/delete_course_submittion", async (req, res) => {
     }
 });
 
+
+// GET all uploaded courses (Admin view)
+router.get("/get_all_uploaded_course", async (req, res) => {
+    try {
+
+        const courses = await Course.find({
+            tutor: { $ne: "69a9403baad07a476521df9d" }
+        })
+
+            .populate({
+                path: "tutor",
+                populate: {
+                    path: "user",
+                    select: "fullName profileImage"
+                }
+            })
+            .sort({ createdAt: -1 });
+
+        const formatted = courses.map(course => ({
+            id: course._id,
+
+            // FIXED FIELDS
+            courseTitle: course.name,
+            description: course.overview,
+
+            courseImage: course.thumbnail?.url || "",
+
+            tutorName: course.tutor?.user?.fullName || "Unknown",
+            tutorImage: course.tutor?.user?.profileImage || "",
+
+            totalLessons: course.lessons?.length || 0,
+
+            // NEW STATUS FIELD (IMPORTANT)
+            status: course.isPublished ? "published" : "draft"
+        }));
+
+        res.json({
+            message: "Courses fetched successfully",
+            courses: formatted
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server error" });
+    }
+});
 module.exports = router;
