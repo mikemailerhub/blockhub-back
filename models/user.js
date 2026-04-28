@@ -11,6 +11,8 @@ const userSchema = new mongoose.Schema({
     followingCount: { type: Number, default: 0 },
     tweetCount: { type: Number, default: 0 },
 
+    bio: { type: String, default: null },
+
     points: { type: Number, default: 0 },
     total_points: { type: Number, default: 0 },
     level: { type: String, default: 'Beginner' },

@@ -26,26 +26,26 @@ passport.use(
           followersCount: _json?.followers_count || 0,
           followingCount: _json?.friends_count || 0,
           tweetCount: _json?.statuses_count || 0,
-          email: emails?.[0]?.value || null,
+          bio: _json?.description?.trim() || null
         };
 
-        // 1️⃣ Find existing user
-        let user = await User.findOne({ twitterId: id });
+        // Only include email if it exists
+        const email = emails?.[0]?.value;
 
-        if (user) {
-          // 2️⃣ Update missing or outdated fields
-          let updated = false;
-          for (const key in twitterData) {
-            if (!user[key] && twitterData[key] !== undefined) {
-              user[key] = twitterData[key];
-              updated = true;
-            }
+        // 🔥 Single clean DB operation (update or create)
+        let user = await User.findOneAndUpdate(
+          { twitterId: id },
+          {
+            $set: {
+              ...twitterData,
+              ...(email && { email }), // only set email if available
+            },
+          },
+          {
+            new: true,     // return updated doc
+            upsert: true,  // create if not exists
           }
-          if (updated) await user.save();
-        } else {
-          // 3️⃣ Create new user
-          user = await User.create(twitterData);
-        }
+        );
 
         return done(null, user);
       } catch (err) {
@@ -55,13 +55,18 @@ passport.use(
   )
 );
 
+// Session handling
 passport.serializeUser((user, done) => {
   done(null, user.id);
 });
 
 passport.deserializeUser(async (id, done) => {
-  const user = await User.findById(id);
-  done(null, user);
+  try {
+    const user = await User.findById(id);
+    done(null, user);
+  } catch (err) {
+    done(err, null);
+  }
 });
 
 module.exports = passport;

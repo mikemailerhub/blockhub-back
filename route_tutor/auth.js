@@ -78,7 +78,7 @@ router.post("/login-tutor", async (req, res) => {
         admin: tutor.user.admin
       },
       TUTOR_ACCESS_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "30d" }
     );
 
     // Convert Mongoose doc to plain object

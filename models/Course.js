@@ -24,7 +24,7 @@ const quizSchema = new mongoose.Schema({
 const lessonSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, default: '' },
-  type: { type: String, enum: ['note', 'video'], default: 'note' },
+  type: { type: String, enum: ['note', 'video','slide'], default: 'note' },
 
   // Can be either string (note content) or object (video file info)
   content: { type: mongoose.Schema.Types.Mixed, default: '' },
