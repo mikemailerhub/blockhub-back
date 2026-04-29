@@ -23,12 +23,12 @@ const verifyUser = (req, res, next) => {
 };
 
 
+const excludedTutorId = "69a9403baad07a476521df9d";
 
 // Endpoint to get all courses
 router.get('/courses', async (req, res) => {
     try {
 
-        const excludedTutorId = "69a9403baad07a476521df9d";
 
         const courses = await Course.find({
             isPublished: true,
