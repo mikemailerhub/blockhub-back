@@ -31,8 +31,8 @@ const io = socket.init(server);
 // ===============================
 const dnsPromises = require("node:dns/promises");
 const dns = require("dns");
-dnsPromises.setServers(["1.1.1.1", "8.8.8.8"]);
-dns.setDefaultResultOrder("ipv4first");
+// dnsPromises.setServers(["1.1.1.1", "8.8.8.8"]);
+// dns.setDefaultResultOrder("ipv4first");
 
 // ===============================
 // Middleware
