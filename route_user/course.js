@@ -49,6 +49,46 @@ router.get('/courses', async (req, res) => {
     }
 });
 
+
+// PUBLIC: Get single course by ID (no auth)
+router.get("/course/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const course = await Course.findOne({
+            _id: id,
+            isPublished: true,
+            isDraft: false,
+            tutor: { $ne: excludedTutorId }
+        }).populate({
+            path: "tutor",
+            populate: {
+                path: "user",
+                select: "fullName twitterHandle profileImage bio"
+            }
+        });
+
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: "Course not found"
+            });
+        }
+
+        return res.json({
+            success: true,
+            data: course
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+});
+
+
 // 🔥 GET USER COURSES
 router.get("/user_courses", verifyUser, async (req, res) => {
     try {
