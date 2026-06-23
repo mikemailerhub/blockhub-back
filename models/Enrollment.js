@@ -12,6 +12,23 @@ const enrollmentSchema = new mongoose.Schema({
 
   quizCompletedLessons: [{ type: Number, default: [] }],
 
+  // certificates
+  certificateStatus: {
+    type: String,
+    enum: ["pending", "processing", "delivered"],
+    default: "pending",
+  },
+
+  certificateUrl: {
+    type: String,
+    default: null,
+  },
+
+  certificateIssuedAt: {
+    type: Date,
+    default: null,
+  },
+
   enrolledAt: { type: Date, default: Date.now },
   completedAt: { type: Date, default: null },
   lastAccessedAt: { type: Date, default: Date.now },

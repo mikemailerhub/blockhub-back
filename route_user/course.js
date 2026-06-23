@@ -23,6 +23,34 @@ const verifyUser = (req, res, next) => {
 };
 
 
+async function generateCertificateAsync(enrollmentId) {
+    setTimeout(async () => {
+        const enrollment = await Enrollment.findById(enrollmentId)
+            .populate("user")
+            .populate("course");
+
+        if (!enrollment) return;
+
+        // 1. generate image/pdf
+        const certificateUrl = await generateCertificateImage({
+            name: enrollment.user.fullName,
+            course: enrollment.course.name,
+            date: enrollment.completedAt,
+        });
+
+        // 2. update DB
+        enrollment.certificateStatus = "delivered";
+        enrollment.certificateUrl = certificateUrl;
+        enrollment.certificateIssuedAt = new Date();
+
+        await enrollment.save();
+
+        // 3. send email
+        await sendCertificateEmail(enrollment.user.email, certificateUrl);
+
+    }, 3000); // simulate async job
+}
+
 const excludedTutorId = "69a9403baad07a476521df9d";
 
 // Endpoint to get all courses
@@ -109,8 +137,21 @@ router.get("/user_courses", verifyUser, async (req, res) => {
         const completed = enrollments.filter(e => e.completed);
 
         res.json({
-            active,
-            completed,
+            active: active.map(e => ({
+                ...e,
+                course: e.course,
+                certificateStatus: e.certificateStatus,
+                certificateUrl: e.certificateUrl,
+                certificateIssuedAt: e.certificateIssuedAt,
+            })),
+
+            completed: completed.map(e => ({
+                ...e,
+                course: e.course,
+                certificateStatus: e.certificateStatus,
+                certificateUrl: e.certificateUrl,
+                certificateIssuedAt: e.certificateIssuedAt,
+            })),
         });
 
     } catch (err) {
@@ -356,12 +397,20 @@ router.post("/complete_course", verifyUser, async (req, res) => {
             return res.status(404).json({ message: "Not enrolled in course" });
         }
 
-        // ✅ mark everything complete
+        // ❌ prevent re-processing
+        if (enrollment.completed) {
+            return res.json({
+                success: true,
+                message: "Already completed",
+                enrollment,
+            });
+        }
+
+        // ✅ mark course completion
         enrollment.completed = true;
         enrollment.progress = 100;
         enrollment.completedAt = new Date();
 
-        // optional safety: ensure all lessons are marked done
         if (enrollment.totalLessons > 0) {
             enrollment.completedLessons = Array.from(
                 { length: enrollment.totalLessons },
@@ -369,9 +418,14 @@ router.post("/complete_course", verifyUser, async (req, res) => {
             );
         }
 
+        // 🔥 NEW: trigger certificate pipeline
+        enrollment.certificateStatus = "processing";
+
         await enrollment.save();
 
-        // 🔥 return normalized format for frontend cache update
+        // 🚀 ASYNC CERTIFICATE GENERATION (IMPORTANT)
+        generateCertificateAsync(enrollment._id);
+
         const response = {
             courseId: enrollment.course.toString(),
             progress: enrollment.progress,
@@ -379,12 +433,14 @@ router.post("/complete_course", verifyUser, async (req, res) => {
             completedLessons: enrollment.completedLessons,
             totalLessons: enrollment.totalLessons,
             lastLessonIndex: enrollment.totalLessons - 1,
+
+            // 🔥 add this
+            certificateStatus: enrollment.certificateStatus,
         };
 
         return res.json({
             success: true,
             message: "Course completed successfully",
-            enrollment,
             userCourse: response,
         });
 
