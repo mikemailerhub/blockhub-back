@@ -1,34 +1,46 @@
-const jwt = require('jsonwebtoken');
-const Tutor = require('../models/Tutor');
+const jwt = require("jsonwebtoken");
+const Tutor = require("../models/Tutor");
 
-const TUTOR_ACCESS_SECRET = process.env.TUTOR_ACCESS_SECRET_KEY || 'tutoraccesskey';
+const TUTOR_ACCESS_SECRET =
+  process.env.TUTOR_ACCESS_SECRET_KEY || "tutoraccesskey";
 
-// Middleware to verify tutor token
 const verifyTutorToken = async (req, res, next) => {
   try {
-    // Expect token in Authorization header: "Bearer <token>"
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ message: 'No token provided' });
+    const token = req.cookies?.tutorToken;
 
-    const token = authHeader.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'Invalid token format' });
+    if (!token) {
+      return res.status(401).json({
+        message: "No tutor token provided"
+      });
+    }
 
-    // Verify JWT
-    const decoded = jwt.verify(token, TUTOR_ACCESS_SECRET);
+    const decoded = jwt.verify(
+      token,
+      TUTOR_ACCESS_SECRET
+    );
 
-    // Attach tutorId & userId to request
     req.tutorId = decoded.tutorId;
     req.userId = decoded.userId;
 
-    // Optional: check if tutor still exists
-    const tutor = await Tutor.findById(req.tutorId);
-    if (!tutor) return res.status(404).json({ message: 'Tutor not found' });
+    const tutor = await Tutor.findById(
+      decoded.tutorId
+    );
 
-    req.tutor = tutor; // attach tutor document for convenience
+    if (!tutor) {
+      return res.status(404).json({
+        message: "Tutor not found"
+      });
+    }
+
+    req.tutor = tutor;
+
     next();
   } catch (err) {
     console.error(err);
-    return res.status(401).json({ message: 'Invalid or expired token' });
+
+    return res.status(401).json({
+      message: "Invalid or expired tutor token"
+    });
   }
 };
 

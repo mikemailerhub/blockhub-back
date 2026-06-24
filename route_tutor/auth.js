@@ -88,10 +88,16 @@ router.post("/login-tutor", async (req, res) => {
     if (tutorObj.user && tutorObj.user.admin !== undefined) {
       delete tutorObj.user.admin;
     }
+    res.cookie("tutorToken", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      maxAge: 1000 * 60 * 60 * 24 * 30,
+    });
 
     res.status(200).json({
       message: "Login successful",
-      token,
+
       tutor: tutorObj, // all fields except admin
       allCourses: allTutorCourses
     });

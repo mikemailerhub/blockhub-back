@@ -5,7 +5,8 @@ const auth = async (req, res, next) => {
     try {
         const token = req.cookies?.token; // ✅ COOKIE ONLY
 
-      
+        console.log("COOKIE:", req.cookies);
+        console.log("TOKEN:", req.cookies?.token);
         // console.log(token)
         if (!token) {
             return res.status(401).json({
