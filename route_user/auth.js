@@ -7,6 +7,8 @@ const payment = require('../models/payment');
 const { TwitterApi } = require('twitter-api-v2');
 const twitterOAuth = require('../models/twitterOAuth');
 const user = require('../models/user');
+const auth = require('../middlewave/auth');
+const sanitizeUser = require('../utils/sanitizeUser');
 const router = express.Router();
 
 // Initialize Twitter client (OAuth2 PKCE)
@@ -175,6 +177,24 @@ router.get('/auth/twitter/callback', async (req, res) => {
     console.error('User Twitter callback error:', err);
     res.redirect(`${process.env.FRONTEND_URL}`);
   }
+});
+
+
+router.get("/me", auth, (req, res) => {
+  res.json({
+    success: true,
+    user: sanitizeUser(req.user),
+  });
+});
+
+
+router.post("/logout", (req, res) => {
+  res.clearCookie("token");
+
+  res.json({
+    success: true,
+    message: "Logged out successfully"
+  });
 });
 
 

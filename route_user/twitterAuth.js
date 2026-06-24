@@ -3,6 +3,7 @@ const router = express.Router();
 const passport = require("../confiq/passport");
 const jwt = require("jsonwebtoken");
 const user = require("../models/user");
+const setAuthCookie = require("../utils/setAuthCookie");
 
 
 // Step 1: Redirect to Twitter
@@ -31,45 +32,42 @@ router.get(
             });
 
             // Serialize full user object for frontend
-            const { admin, ...userWithoutAdmin } = user.toObject();
 
-            const fullUser = {
-                ...userWithoutAdmin,
-                token,
-            };
 
-            const encodedUser = encodeURIComponent(
-                Buffer.from(JSON.stringify(fullUser)).toString("base64")
-            );
 
             const frontendUrl = process.env.USER_FRONTEND_URL || "http://localhost:5173";
 
             // ✅ Dynamic redirect based on `source`
+
             const source = req.session.twitterSource || "website";
-            let redirectBase = frontendUrl;
+
+            let redirectBase = `${frontendUrl}/profile`;
 
             switch (source) {
                 case "academy":
                     redirectBase = `${frontendUrl}/academy/waitlist`;
                     break;
+
                 case "website":
                     redirectBase = `${frontendUrl}/profile`;
                     break;
+
                 case "marketplace":
                     redirectBase = `${frontendUrl}/market`;
                     break;
+
                 case "continueAcademy":
                     redirectBase = `${frontendUrl}/dashboard`;
                     break;
+
                 case "newAcademy":
                     redirectBase = `${frontendUrl}/academy/courses`;
                     break;
-                default:
-                    redirectBase = `${frontendUrl}/profile`;
             }
 
-            // Redirect to frontend with JWT + encoded user
-            res.redirect(`${redirectBase}?token=${token}&user=${encodedUser}`);
+            setAuthCookie(res, token);
+
+            return res.redirect(redirectBase);
         } catch (err) {
             console.error("Twitter callback error:", err);
             res.redirect(`${process.env.USER_FRONTEND_URL}`);
@@ -157,11 +155,13 @@ router.post("/login", async (req, res) => {
         const frontendUrl = process.env.USER_FRONTEND_URL || "http://localhost:5173";
         const redirectUrl = `${frontendUrl}/profile?token=${token}&user=${encodedUser}`;
 
+        setAuthCookie(res, token);
+
         res.json({
             success: true,
-            redirectUrl,
-            fullUser,
+            user: sanitizeUser(userInstance),
         });
+
     } catch (err) {
         console.error("Login error:", err);
         res.status(500).json({

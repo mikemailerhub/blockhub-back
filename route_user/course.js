@@ -57,6 +57,7 @@ const excludedTutorId = "69a9403baad07a476521df9d";
 router.get('/courses', async (req, res) => {
     try {
 
+        console.log("starting")
 
         const courses = await Course.find({
             isPublished: true,
@@ -70,6 +71,8 @@ router.get('/courses', async (req, res) => {
                     select: 'fullName twitterHandle profileImage bio' // adjust based on your user model
                 }
             });
+
+        console.log("ending")
 
         res.json(courses);
     } catch (error) {

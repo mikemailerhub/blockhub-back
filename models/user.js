@@ -33,7 +33,11 @@ const userSchema = new mongoose.Schema({
     isTutor: { type: Boolean, default: false }, // NEW: quick flag
     tutorProfile: { type: mongoose.Schema.Types.ObjectId, ref: 'tutors' },
 
-
+    walletAddress: {
+        type: String,
+        default: null,
+    },
+    
     source: { type: String, default: 'website' }, // track login source
 
     admin: { type: Boolean, default: false }, // NEW: admin flag
