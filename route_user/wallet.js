@@ -46,5 +46,32 @@ router.post("/connect-wallet", auth, async (req, res) => {
     }
 });
 
+router.post("/disconnect-wallet", auth, async (req, res) => {
+    try {
+        const user = await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                $unset: {
+                    walletAddress: 1
+                }
+            },
+            {
+                new: true
+            }
+        );
+
+        res.json({
+            success: true,
+            message: "Wallet disconnected",
+            user: sanitizeUser(user)
+        });
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+    }
+});
 
 module.exports = router;
