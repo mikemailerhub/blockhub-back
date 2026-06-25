@@ -88,13 +88,13 @@ router.post("/generate_wallet_token", auth, async (req, res) => {
         await mobileAuthToken.create({
             userId: req.user._id,
             token,
-            expireAt
+            expiresAt
         })
 
         res.json({
             success: true,
             token,
-            expireAt
+            expiresAt
         })
     }
 
