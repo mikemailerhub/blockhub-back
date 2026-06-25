@@ -138,7 +138,7 @@ router.post("/wallet_login", async (req, res) => {
 
         const authToken = jwt.sign(
             {
-                _id: user._id
+                id: user._id
             },
             process.env.JWT_SECRET,
             {
@@ -154,6 +154,9 @@ router.post("/wallet_login", async (req, res) => {
         await mobileAuthToken.deleteOne({
             _id: mobileToken._id
         });
+
+        console.log("SETTING COOKIE FOR:", user._id);
+        console.log("AUTH TOKEN:", authToken);
 
         return res.json({
             success: true,
