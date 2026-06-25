@@ -44,7 +44,8 @@ const allowedOrigins = [
     'https://admin.blockhubglobal.xyz',
     'https://app.blockhubglobal.xyz',
     'https://dashboard.blockhubglobal.xyz',
-    'https://blockhubglobal.xyz'
+    'https://blockhubglobal.xyz',
+    'http://172.20.10.4:5173/'
 ];
 
 

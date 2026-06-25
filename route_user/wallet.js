@@ -10,6 +10,10 @@ const User = require('../models/user');
 const auth = require('../middlewave/auth');
 const sanitizeUser = require('../utils/sanitizeUser');
 const router = express.Router();
+const crypto = require("crypto");
+const MobileAuthToken = require("../models/mobileAuthToken");
+const mobileAuthToken = require('../models/mobileAuthToken');
+const setAuthCookie = require('../utils/setAuthCookie');
 
 
 router.post("/connect-wallet", auth, async (req, res) => {
@@ -73,5 +77,98 @@ router.post("/disconnect-wallet", auth, async (req, res) => {
         });
     }
 });
+
+
+router.post("/generate_wallet_token", auth, async (req, res) => {
+    try {
+        const token = crypto.randomBytes(32).toString("hex");
+
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000)
+
+        await mobileAuthToken.create({
+            userId: req.user._id,
+            token,
+            expireAt
+        })
+
+        res.json({
+            success: true,
+            token,
+            expireAt
+        })
+    }
+
+    catch (err) {
+
+        res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+
+    }
+
+})
+
+router.post("/wallet_login", async (req, res) => {
+    try {
+
+        const { token } = req.body;
+
+        const mobileToken =
+            await mobileAuthToken.findOne({
+                token
+            });
+
+        if (!mobileToken) {
+            return res.status(401).json({
+                success: false
+            });
+        }
+
+        const user =
+            await User.findById(
+                mobileToken.userId
+            );
+
+        if (!user) {
+            return res.status(404).json({
+                success: false
+            });
+        }
+
+        const authToken = jwt.sign(
+            {
+                _id: user._id
+            },
+            process.env.JWT_SECRET,
+            {
+                expiresIn: "30d"
+            }
+        );
+
+        setAuthCookie(
+            res,
+            authToken
+        );
+
+        await mobileAuthToken.deleteOne({
+            _id: mobileToken._id
+        });
+
+        return res.json({
+            success: true,
+            user: sanitizeUser(user)
+        });
+
+    } catch (err) {
+
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
+
+    }
+});
+
 
 module.exports = router;
