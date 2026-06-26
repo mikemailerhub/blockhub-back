@@ -2,11 +2,56 @@ const express = require('express');
 const Payment = require('../models/payment');
 const user = require('../models/user');
 const { sendSuccessMessage } = require('../utils/nodemailer');
+
+const axios = require("axios");
 const crypto = require("crypto");
+
+
+const Course = require("../models/Course");
+const Purchase = require("../models/purchase");
+const Enrollment = require("../models/Enrollment");
+const auth = require('../middlewave/auth');
+
 
 // Create new payment
 const router = express.Router();
 
+
+
+
+async function fetchFXRates() {
+    try {
+        const res = await axios.get(
+            "https://open.er-api.com/v6/latest/USD",
+            { timeout: 5000 }
+        );
+
+        const ngnRate = res.data?.rates?.NGN;
+
+        if (!ngnRate) throw new Error("NGN rate missing from FX API");
+
+
+
+
+        return ngnRate;
+    } catch (err) {
+        console.log("⚠️ FX fetch failed:", err.message);
+
+        // fallback (VERY IMPORTANT for production stability)
+        const fallback = 1500;
+
+        priceCache.set("usd_ngn", {
+            price: fallback,
+            timestamp: Date.now()
+        });
+
+        await saveToMongo("usd_ngn", fallback);
+
+        console.log(`🟡 USING FALLBACK USD → NGN = ${fallback}`);
+
+        return fallback;
+    }
+}
 
 
 
@@ -31,9 +76,6 @@ router.get("/use_token/:token", async (req, res) => {
         return res.status(400).send("No booking link found for this payment.");
     }
 });
-
-
-
 
 router.post('/create_payment', async (req, res) => {
     try {
@@ -144,6 +186,317 @@ router.post('/mark_as_paid', async (req, res) => {
     } catch (err) {
         console.error("❌ Error in mark_as_paid:", err);
         res.status(500).json({ message: 'Server error' });
+    }
+});
+
+
+router.post("/course_payment_initialize", auth, async (req, res) => {
+    try {
+
+        const { courseId } = req.body;
+
+        if (!courseId) {
+            return res.status(400).json({
+                success: false,
+                message: "Course ID is required"
+            });
+        }
+
+        // Find course
+        const course = await Course.findById(courseId);
+
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: "Course not found"
+            });
+        }
+
+        const originalAmount = course.pricing.amount;
+        const currency = course.pricing.currency;
+
+        let convertedAmount = originalAmount;
+        let exchangeRate = null;
+
+        // Only convert if course is priced in USDT/USD
+        if (currency === "USDT" || currency === "USD") {
+            exchangeRate = await fetchFXRates();
+            convertedAmount = originalAmount * exchangeRate;
+        }
+
+        // Platform fee (10%)
+        const platformFee = convertedAmount * 0.10;
+
+        // Amount customer pays
+        const finalAmount = Math.round(convertedAmount + platformFee);
+
+        // Already enrolled?
+        const already = await Enrollment.findOne({
+            user: req.user._id,
+            course: course._id
+        });
+
+        // if (already) {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: "Already enrolled"
+        //     });
+        // }
+
+        // Free Course
+        if (course.pricing.type === "free") {
+
+            const enrollment = await Enrollment.create({
+                user: req.user._id,
+                course: course._id,
+                totalLessons: course.lessons.length,
+                progress: 0,
+                completed: false,
+                completedLessons: []
+            });
+
+            return res.json({
+                success: true,
+                free: true,
+                enrollment
+            });
+
+        }
+
+        const amount = course.pricing.amount;
+
+        const reference =
+            `BH_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+
+        // Save purchase
+        const purchase = await Purchase.create({
+
+            user: req.user._id,
+
+            course: course._id,
+
+            tutor: course.tutor,
+
+            amount: finalAmount,
+
+            currency: "NGN",
+
+            paymentMethod: "paystack",
+
+            paymentReference: reference,
+
+            paymentStatus: "pending"
+
+        });
+
+        // Initialize Paystack
+
+        const response = await axios.post(
+
+            "https://api.paystack.co/transaction/initialize",
+
+            {
+
+                email: req.user.email,
+
+                amount: finalAmount * 100,
+
+                currency: "NGN",
+
+                reference,
+
+                callback_url:
+                    `${process.env.FRONTEND_URL}/payment/success`
+
+            },
+
+            {
+
+                headers: {
+
+                    Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+
+                    "Content-Type": "application/json"
+
+                }
+
+            }
+
+        );
+
+        return res.json({
+            success: true,
+
+            pricing: {
+                originalAmount,
+                originalCurrency: currency,
+
+                exchangeRate, // null if no conversion happened
+
+                convertedAmount,
+                platformFee,
+                total: finalAmount,
+
+                payableCurrency: "NGN"
+            },
+
+            authorization_url: response.data.data.authorization_url,
+            access_code: response.data.data.access_code,
+            reference
+        });
+    }
+
+    catch (err) {
+
+        console.log(err.response?.data || err);
+
+        res.status(500).json({
+
+            success: false,
+
+            message: err.message
+
+        });
+
+    }
+
+});
+
+router.get("/course_payment_verify", auth, async (req, res) => {
+    try {
+
+        const { reference } = req.query;
+
+        if (!reference) {
+            return res.status(400).json({
+                success: false,
+                message: "Payment reference is required"
+            });
+        }
+
+        // Find purchase
+        const purchase = await Purchase.findOne({
+            paymentReference: reference,
+            user: req.user._id
+        });
+
+        if (!purchase) {
+            return res.status(404).json({
+                success: false,
+                message: "Purchase not found"
+            });
+        }
+
+        // Prevent duplicate verification
+        if (purchase.paymentStatus === "paid") {
+
+            const enrollment = await Enrollment.findOne({
+                user: req.user._id,
+                course: purchase.course
+            });
+
+            return res.json({
+                success: true,
+                alreadyVerified: true,
+                enrollment
+            });
+
+        }
+
+        // Verify with Paystack
+
+        const verify = await axios.get(
+            `https://api.paystack.co/transaction/verify/${reference}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
+                }
+            }
+        );
+
+        const payment = verify.data.data;
+
+        if (payment.status !== "success") {
+
+            purchase.paymentStatus = "failed";
+            await purchase.save();
+
+            return res.status(400).json({
+                success: false,
+                message: "Payment not successful"
+            });
+
+        }
+
+        purchase.paymentStatus = "paid";
+        purchase.transactionHash = payment.reference;
+
+        await purchase.save();
+
+        // Get course
+
+        const course = await Course.findById(purchase.course);
+
+        // Create enrollment if missing
+
+        let enrollment = await Enrollment.findOne({
+            user: req.user._id,
+            course: purchase.course
+        });
+
+        if (!enrollment) {
+
+            enrollment = await Enrollment.create({
+
+                user: req.user._id,
+
+                course: purchase.course,
+
+                totalLessons: course.lessons.length,
+
+                progress: 0,
+
+                completed: false,
+
+                completedLessons: []
+
+            });
+
+            await Course.findByIdAndUpdate(
+                course._id,
+                {
+                    $inc: {
+                        totalEnrollments: 1
+                    }
+                }
+            );
+
+        }
+
+        return res.json({
+
+            success: true,
+
+            message: "Payment verified",
+
+            purchase,
+
+            enrollment
+
+        });
+
+    } catch (err) {
+
+        console.log(err.response?.data || err);
+
+        res.status(500).json({
+
+            success: false,
+
+            message: err.message
+
+        });
+
     }
 });
 

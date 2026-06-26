@@ -9,12 +9,13 @@ const payment = require('../models/payment');
 const uploader = require('../utils/multer')
 const router = express.Router();
 const cloudinary = require('../utils/cloudinary');
+const auth = require('../middlewave/auth');
 
 
 
 
 
-router.post('/get_user_interest', async(req, res) => {
+router.post('/get_user_interest', async (req, res) => {
     try {
         const { token } = req.body;
 
@@ -34,7 +35,7 @@ router.post('/get_user_interest', async(req, res) => {
     }
 });
 
-router.post('/edit_interest', async(req, res) => {
+router.post('/edit_interest', async (req, res) => {
     const { token, interest } = req.body;
 
     if (!token || !interest) {
@@ -67,7 +68,7 @@ router.post('/edit_interest', async(req, res) => {
 
 
 // Get all portfolio for a user
-router.post('/get_portfolio', async(req, res) => {
+router.post('/get_portfolio', async (req, res) => {
     const { token } = req.body;
     if (!token) return res.status(400).json({ message: 'Token is required' });
 
@@ -90,7 +91,7 @@ router.post('/get_portfolio', async(req, res) => {
 
 
 // ADD / UPLOAD PORTFOLIO
-router.post('/add_portfolio', uploader.single('file'), async(req, res) => {
+router.post('/add_portfolio', uploader.single('file'), async (req, res) => {
     const { token } = req.body;
     if (!token) return res.status(400).json({ message: 'Token is required' });
 
@@ -138,7 +139,7 @@ router.post('/add_portfolio', uploader.single('file'), async(req, res) => {
 
 // POST /user_profile/portfolios/select
 // POST /user_profile/portfolios/select
-router.post('/portfolios/select', async(req, res) => {
+router.post('/portfolios/select', async (req, res) => {
     const { token, portfolioId } = req.body;
     if (!token || !portfolioId) {
         return res.status(400).json({ message: 'Token and portfolioId are required' });
@@ -190,7 +191,7 @@ router.post('/portfolios/select', async(req, res) => {
 
 
 // DELETE PORTFOLIO
-router.post('/delete_portfolio', async(req, res) => {
+router.post('/delete_portfolio', async (req, res) => {
     const { token, publicId } = req.body;
     if (!token || !publicId) {
         return res.status(400).json({ message: 'Token and publicId are required' });
@@ -231,5 +232,177 @@ router.post('/delete_portfolio', async(req, res) => {
     }
 });
 
+router.get('/getBanks', async (req, res) => {
+    try {
+        const response = await axios.get(
+            "https://api.paystack.co/bank",
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+                },
+            }
+        );
+
+        return res.json({
+            success: true,
+            banks: response.data.data,
+        });
+
+    } catch (error) {
+        console.log(error.response?.data || error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to fetch banks",
+        });
+    }
+})
+
+router.post('/resolve_account', async (req, res) => {
+    try {
+
+        const { accountNumber, bankCode } = req.body;
+
+        if (!accountNumber || !bankCode) {
+            return res.status(400).json({
+                success: false,
+                message: "Account number and bank code are required."
+            });
+        }
+
+        const response = await axios.get(
+            `https://api.paystack.co/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
+                }
+            }
+        );
+
+        return res.json({
+            success: true,
+            account: response.data.data
+        });
+
+    } catch (err) {
+
+        return res.status(400).json({
+            success: false,
+            message:
+                err.response?.data?.message ||
+                "Unable to resolve account."
+        });
+
+    }
+})
+
+
+router.post("/save_account", auth, async (req, res) => {
+    try {
+
+        const {
+            accountNumber,
+            bankCode,
+        } = req.body;
+
+        if (!accountNumber || !bankCode) {
+            return res.status(400).json({
+                success: false,
+                message: "Account number and bank code are required."
+            });
+        }
+
+        const User = req.user;
+
+        // Resolve account with Paystack
+        const resolved = await axios.get(
+            `https://api.paystack.co/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+                },
+            }
+        );
+
+        const account = resolved.data.data;
+
+        // Create transfer recipient
+        const recipient = await axios.post(
+            "https://api.paystack.co/transferrecipient",
+            {
+                type: "nuban",
+                name: account.account_name,
+                account_number: account.account_number,
+                bank_code: bankCode,
+                currency: "NGN",
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+                },
+            }
+        );
+        console.log(recipient.data);
+
+        User.nairaAccount = {
+            accountNumber: account.account_number,
+            accountName: account.account_name,
+            bankName: recipient.data.data.details.bank_name,
+            bankCode,
+            recipientCode: recipient.data.data.recipient_code,
+            recipientId: recipient.data.data.id,
+            verified: true,
+            activatedAt:
+                User.nairaAccount?.activatedAt || new Date(),
+            updatedAt: new Date(),
+        };
+
+        await User.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Withdrawal account saved successfully.",
+            account: User.nairaAccount,
+        });
+
+    } catch (err) {
+
+        console.log(err.response?.data || err);
+
+        return res.status(500).json({
+            success: false,
+            message:
+                err.response?.data?.message ||
+                "Unable to save withdrawal account.",
+        });
+
+    }
+});
+
+router.delete("/disconnect_account", auth, async (req, res) => {
+
+    const user = req.user;
+
+    user.nairaAccount = {
+        accountNumber: null,
+        accountName: null,
+        bankName: null,
+        bankCode: null,
+        recipientCode: null,
+        recipientId: null,
+        verified: false,
+        activatedAt: null,
+        updatedAt: new Date(),
+    };
+
+    await user.save();
+
+    res.json({
+        success: true,
+        message: "Bank account disconnected.",
+    });
+
+}
+);
 
 module.exports = router

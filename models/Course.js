@@ -24,7 +24,7 @@ const quizSchema = new mongoose.Schema({
 const lessonSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, default: '' },
-  type: { type: String, enum: ['note', 'video','slides'], default: 'note' },
+  type: { type: String, enum: ['note', 'video', 'slides'], default: 'note' },
 
   // Can be either string (note content) or object (video file info)
   content: { type: mongoose.Schema.Types.Mixed, default: '' },
@@ -42,6 +42,29 @@ const courseSchema = new mongoose.Schema(
     overview: { type: String, default: '' },
     thumbnail: { type: fileSchema },
     level: { type: String, default: 'Beginner' },
+
+    pricing: {
+      type: {
+        type: String,
+        enum: ["free", "paid"],
+        default: "free"
+      },
+
+      amount: {
+        type: Number,
+        default: 0
+      },
+
+      currency: {
+        type: String,
+        default: "USD"
+      },
+      discount: {
+        type: Number,
+        default: 0
+      }
+    },
+
     tag: { type: String, default: '' },
     twitter: { type: String, default: '' },
     website: { type: String, default: '' },

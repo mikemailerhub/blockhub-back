@@ -9,16 +9,48 @@ const User = require('../models/user');
 require('dotenv').config();
 
 
-const verifyUser = (req, res, next) => {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ message: "No token" });
-
+const verifyUser = async (req, res, next) => {
     try {
+        // ✅ Cookie first
+        let token = req.cookies?.token;
+
+        // Optional fallback for mobile/API clients
+        if (!token) {
+            const authHeader = req.headers.authorization;
+
+            if (authHeader?.startsWith("Bearer ")) {
+                token = authHeader.split(" ")[1];
+            }
+        }
+
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication required",
+            });
+        }
+
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded;
+
+        // Get fresh user from DB
+        const user = await User.findById(decoded.id).select("-password");
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        req.user = user;
+
         next();
-    } catch {
-        res.status(401).json({ message: "Invalid token" });
+
+    } catch (err) {
+        return res.status(401).json({
+            success: false,
+            message: "Invalid or expired session",
+        });
     }
 };
 
@@ -57,12 +89,12 @@ const excludedTutorId = "69a9403baad07a476521df9d";
 router.get('/courses', async (req, res) => {
     try {
 
-        console.log("starting")
+        // console.log("starting")
 
         const courses = await Course.find({
             isPublished: true,
             isDraft: false,
-            tutor: { $ne: excludedTutorId } // 👈 EXCLUDE THIS TUTOR
+            // tutor: { $ne: excludedTutorId } // 👈 EXCLUDE THIS TUTOR
         })
             .populate({
                 path: 'tutor',
@@ -72,7 +104,7 @@ router.get('/courses', async (req, res) => {
                 }
             });
 
-        console.log("ending")
+        // console.log("ending")
 
         res.json(courses);
     } catch (error) {
@@ -142,6 +174,7 @@ router.get("/user_courses", verifyUser, async (req, res) => {
         res.json({
             active: active.map(e => ({
                 ...e,
+                isPaid: true,
                 course: e.course,
                 certificateStatus: e.certificateStatus,
                 certificateUrl: e.certificateUrl,

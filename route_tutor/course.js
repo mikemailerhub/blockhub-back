@@ -18,6 +18,7 @@ router.post('/create_course', verifyTutorToken, async (req, res) => {
             twitter,
             website,
             lessons,
+            pricing,
         } = req.body;
 
         if (!name) {
@@ -46,17 +47,22 @@ router.post('/create_course', verifyTutorToken, async (req, res) => {
         const newCourse = new Course({
             tutor: tutor._id,
             name,
-            overview: overview || '',
-            thumbnail: safeThumbnail || '',
-            level: level || 'Beginner',
-            tag: tag || '',
-            twitter: twitter || '',
-            website: website || '',
+            overview: overview || "",
+            thumbnail: safeThumbnail || "",
+            level: level || "Beginner",
+            tag: tag || "",
+            twitter: twitter || "",
+            website: website || "",
             lessons: lessons || [],
+            pricing: pricing || {
+                type: "free",
+                amount: 0,
+                currency: "",
+                discount: 0,
+            },
             isPublished: false,
             isDraft: true,
         });
-
         await newCourse.save();
 
         // Update tutor stats
@@ -84,7 +90,7 @@ router.put('/update_course', verifyTutorToken, async (req, res) => {
     try {
         const tutor = req.tutor;
         const {
-            courseId, name, overview, thumbnail, level, tag, twitter, website, lessons,
+            courseId, name, overview, thumbnail, level, tag, twitter, website, lessons, pricing,
         } = req.body;
 
         if (!courseId) {
@@ -116,6 +122,12 @@ router.put('/update_course', verifyTutorToken, async (req, res) => {
         course.tag = tag || course.tag;
         course.twitter = twitter || course.twitter;
         course.website = website || course.website;
+        if (pricing) {
+            course.pricing = {
+                ...course.pricing,
+                ...pricing,
+            };
+        }
         // Handle lessons update
         if (lessons) {
             course.lessons = lessons;

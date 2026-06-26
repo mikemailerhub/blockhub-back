@@ -37,7 +37,25 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: null,
     },
-    
+    nairaAccount: {
+        accountNumber: { type: String, default: null, },
+        accountName: { type: String, default: null, },
+        bankName: { type: String, default: null, },
+        bankCode: { type: String, default: null, },
+        recipientCode: { type: String, default: null, },
+        recipientId: {
+            type: Number,
+            default: null,
+        },
+        verified: { type: Boolean, default: false, },
+        activatedAt: { type: Date, default: null, },
+        updatedAt: {
+            type: Date,
+            default: null,
+        },
+    },
+
+
     source: { type: String, default: 'website' }, // track login source
 
     admin: { type: Boolean, default: false }, // NEW: admin flag

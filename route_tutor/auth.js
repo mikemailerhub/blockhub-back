@@ -4,6 +4,9 @@ const jwt = require("jsonwebtoken");
 const Tutor = require("../models/Tutor");
 const User = require("../models/user");
 const Course = require("../models/Course");
+const verifyTutorToken = require("../functions/verifyTutorToken");
+const sanitizeTutor = require("../utils/sanitizeTutor");
+const sanitizeUser = require("../utils/sanitizeUser");
 
 const TUTOR_ACCESS_SECRET = process.env.TUTOR_ACCESS_SECRET_KEY || "tutoraccesskey";
 
@@ -105,6 +108,43 @@ router.post("/login-tutor", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.get("/me", verifyTutorToken, async (req, res) => {
+  try {
+
+    const tutor = await Tutor.findById(req.tutorId)
+      .populate("user");
+
+    if (!tutor) {
+      return res.status(404).json({
+        success: false,
+        message: "Tutor not found"
+      });
+    }
+
+    const allCourses = await Course.find({
+      tutor: tutor._id
+    });
+
+    return res.status(200).json({
+      success: true,
+      tutor: sanitizeTutor(tutor),
+      user: sanitizeUser(tutor.user),
+      allCourses,
+      isTutor: true
+    });
+
+  } catch (error) {
+
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+
   }
 });
 module.exports = router;

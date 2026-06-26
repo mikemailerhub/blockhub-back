@@ -129,6 +129,7 @@ app.use('/user_waitlist', require('./route_user/waitlist'));
 app.use('/user_courses', require('./route_user/course'));
 app.use('/user_jobs', require('./route_user/jobs'));
 app.use('/user_wallet', require('./route_user/wallet'));
+app.use('/user_payment', require('./route_user/payment'));
 
 // Tutor routes
 app.use('/tutor_auth', require('./route_tutor/auth'));

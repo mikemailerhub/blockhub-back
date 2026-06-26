@@ -232,4 +232,11 @@ router.get('/paystack/paid-users', async (req, res) => {
   }
 });
 
+router.get("/is_admin", auth, (req, res) => {
+  res.json({
+    success: true,
+    isAdmin: req.user.admin,
+  });
+});
+
 module.exports = router;
