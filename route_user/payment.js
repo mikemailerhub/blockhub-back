@@ -16,9 +16,6 @@ const auth = require('../middlewave/auth');
 // Create new payment
 const router = express.Router();
 
-
-
-
 async function fetchFXRates() {
     try {
         const res = await axios.get(
