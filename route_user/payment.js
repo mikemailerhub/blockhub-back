@@ -12,7 +12,6 @@ const Purchase = require("../models/Purchase");
 const Enrollment = require("../models/Enrollment");
 const auth = require('../middlewave/auth');
 
-
 // Create new payment
 const router = express.Router();
 
