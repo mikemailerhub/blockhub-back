@@ -8,7 +8,7 @@ const crypto = require("crypto");
 
 
 const Course = require("../models/Course");
-const Purchase = require("../models/purchase");
+const Purchase = require("../models/Purchase");
 const Enrollment = require("../models/Enrollment");
 const auth = require('../middlewave/auth');
 
