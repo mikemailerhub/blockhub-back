@@ -1,5 +1,6 @@
 const express = require('express');
 const Payment = require('../models/payment');
+const User = require('../models/user');
 const user = require('../models/user');
 const { sendSuccessMessage } = require('../utils/nodemailer');
 
@@ -13,6 +14,7 @@ const Enrollment = require("../models/Enrollment");
 const auth = require('../middlewave/auth');
 const Product = require('../models/Product');
 const Seller = require('../models/Seller');
+const Tutor = require('../models/Tutor');
 
 // Create new payment
 const router = express.Router();
@@ -409,7 +411,8 @@ router.get("/course_payment_verify", auth, async (req, res) => {
         // Find purchase
         const purchase = await Purchase.findOne({
             paymentReference: reference,
-            user: req.user._id
+            user: req.user._id,
+            itemType: "courses"
         });
 
         if (!purchase) {
@@ -465,18 +468,19 @@ router.get("/course_payment_verify", auth, async (req, res) => {
 
         await purchase.save();
 
-        await User.findByIdAndUpdate(
-            req.user._id,
+         const updatedUser = await user.findByIdAndUpdate(
+            purchase.user,
             {
                 $inc: {
-                    totalSpent: purchase.amount,
-                    totalCoursesBought: 1
+                    totalPurchases: 1,
+                    totalSpent: purchase.amount
                 }
-            }
+            },
+            { new: true }
         );
 
         await Tutor.findByIdAndUpdate(
-            purchase.tutor,
+            purchase.seller,
             {
                 $inc: {
                     pendingEarnings: purchase.tutorAmount,

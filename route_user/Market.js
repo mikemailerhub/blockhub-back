@@ -8,6 +8,7 @@ const Enrollment = require('../models/Enrollment');
 const User = require('../models/user');
 const Product = require('../models/Product');
 require('dotenv').config();
+const Seller = require('../models/Seller');
 
 
 // Endpoint to get all courses
