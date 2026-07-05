@@ -11,6 +11,8 @@ const Course = require("../models/Course");
 const Purchase = require("../models/Purchase");
 const Enrollment = require("../models/Enrollment");
 const auth = require('../middlewave/auth');
+const Product = require('../models/Product');
+const Seller = require('../models/Seller');
 
 // Create new payment
 const router = express.Router();
@@ -186,6 +188,7 @@ router.post('/mark_as_paid', async (req, res) => {
 });
 
 
+// Naira payment initialization
 router.post("/course_payment_initialize", auth, async (req, res) => {
     try {
 
@@ -251,6 +254,30 @@ router.post("/course_payment_initialize", auth, async (req, res) => {
                 completedLessons: []
             });
 
+
+            await Purchase.create({
+                user: req.user._id,
+                item: course._id,
+                itemType: "courses",
+                seller: course.tutor,
+                sellerType: "tutors",
+                course: course._id,
+                tutor: course.tutor,
+                amount: 0,
+                platformFee: 0,
+                tutorAmount: 0,
+                currency: "NGN",
+                paymentMethod: "paystack",
+                paymentStatus: "paid",
+                paymentReference: `FREE_${Date.now()}`
+            });
+
+            await User.findByIdAndUpdate(req.user._id, {
+                $inc: {
+                    totalCoursesBought: 1
+                }
+            });
+
             return res.json({
                 success: true,
                 free: true,
@@ -269,13 +296,21 @@ router.post("/course_payment_initialize", auth, async (req, res) => {
 
             user: req.user._id,
 
-            course: course._id,
+            item: course._id,
+            itemType: "courses",
+
+            seller: course.tutor,
+            sellerType: "tutors",
+
+            platformFee,
 
             tutor: course.tutor,
-
             amount: finalAmount,
 
+            course: course._id,
             currency: "NGN",
+            tutorAmount: convertedAmount,
+
 
             paymentMethod: "paystack",
 
@@ -358,6 +393,7 @@ router.post("/course_payment_initialize", auth, async (req, res) => {
 
 });
 
+// Naira payment verification
 router.get("/course_payment_verify", auth, async (req, res) => {
     try {
 
@@ -388,7 +424,7 @@ router.get("/course_payment_verify", auth, async (req, res) => {
 
             const enrollment = await Enrollment.findOne({
                 user: req.user._id,
-                course: purchase.course
+                course: purchase.item
             });
 
             return res.json({
@@ -429,15 +465,35 @@ router.get("/course_payment_verify", auth, async (req, res) => {
 
         await purchase.save();
 
+        await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                $inc: {
+                    totalSpent: purchase.amount,
+                    totalCoursesBought: 1
+                }
+            }
+        );
+
+        await Tutor.findByIdAndUpdate(
+            purchase.tutor,
+            {
+                $inc: {
+                    pendingEarnings: purchase.tutorAmount,
+                    totalStudents: 1
+                }
+            }
+        );
+
         // Get course
 
-        const course = await Course.findById(purchase.course);
+        const course = await Course.findById(purchase.item);
 
         // Create enrollment if missing
 
         let enrollment = await Enrollment.findOne({
             user: req.user._id,
-            course: purchase.course
+            course: purchase.item
         });
 
         if (!enrollment) {
@@ -446,7 +502,7 @@ router.get("/course_payment_verify", auth, async (req, res) => {
 
                 user: req.user._id,
 
-                course: purchase.course,
+                course: purchase.item,
 
                 totalLessons: course.lessons.length,
 
@@ -496,6 +552,465 @@ router.get("/course_payment_verify", auth, async (req, res) => {
     }
 });
 
+router.post("/course_crypto_initialize", auth, async (req, res) => {
+    try {
+
+        const { courseId, paymentMethod } = req.body;
+
+        if (!courseId) {
+            return res.status(400).json({
+                success: false,
+                message: "Course ID is required"
+            });
+        }
+
+        if (!["usdt", "bnb"].includes(paymentMethod)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid payment method"
+            });
+        }
+
+        // Find course
+        const course = await Course.findById(courseId);
+
+        if (!course) {
+            return res.status(404).json({
+                success: false,
+                message: "Course not found"
+            });
+        }
+
+        // Already enrolled?
+        const already = await Enrollment.findOne({
+            user: req.user._id,
+            course: course._id
+        });
+
+        // Uncomment if you want to prevent duplicate purchases
+        /*
+        if (already) {
+            return res.status(400).json({
+                success: false,
+                message: "Already enrolled"
+            });
+        }
+        */
+
+        // Free course
+        if (course.pricing.type === "free") {
+
+            const enrollment = await Enrollment.create({
+                user: req.user._id,
+                course: course._id,
+                totalLessons: course.lessons.length,
+                progress: 0,
+                completed: false,
+                completedLessons: []
+            });
+
+            return res.json({
+                success: true,
+                free: true,
+                enrollment
+            });
+
+        }
+
+        const originalAmount = Number(course.pricing.amount);
+        const originalCurrency = course.pricing.currency;
+
+        let exchangeRate = null;
+        let cryptoAmount = originalAmount;
+
+        /**
+         * Convert to selected crypto
+         */
+
+        if (paymentMethod === "usdt") {
+
+            if (originalCurrency === "NGN") {
+
+                // fetchFXRates() should return NGN per USD
+                // Example: 1 USD = 1580 NGN
+
+                exchangeRate = await fetchFXRates();
+
+                cryptoAmount =
+                    originalAmount / exchangeRate;
+
+            }
+
+            else if (
+                originalCurrency === "USD" ||
+                originalCurrency === "USDT"
+            ) {
+
+                cryptoAmount = originalAmount;
+
+            }
+
+        }
+
+        else if (paymentMethod === "bnb") {
+
+            // We'll implement this after USDT
+            return res.status(400).json({
+                success: false,
+                message: "BNB payment is coming soon."
+            });
+
+        }
+
+        // Platform fee (10%)
+        const platformFee = cryptoAmount * 0.10;
+
+        // Total payable
+        const payableAmount =
+            Number((cryptoAmount + platformFee).toFixed(6));
+
+        // Generate unique payment reference
+        const reference =
+            `BH_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+
+        // Save purchase
+        await Purchase.create({
+
+            user: req.user._id,
+
+            tutor: course.tutor,
+
+            course: course._id,
+
+            amount: payableAmount,
+
+            currency: paymentMethod.toUpperCase(),
+
+            paymentMethod: "crypto",
+
+            paymentReference: reference,
+
+            paymentStatus: "pending"
+
+        });
+
+        return res.json({
+
+            success: true,
+
+            paymentMethod,
+
+            wallet: process.env.CRYPTO_PAYMENT_WALLET,
+
+            reference,
+
+            pricing: {
+
+                originalAmount,
+
+                originalCurrency,
+
+                exchangeRate,
+
+                cryptoAmount:
+                    Number(cryptoAmount.toFixed(6)),
+
+                platformFee:
+                    Number(platformFee.toFixed(6)),
+
+                payableAmount,
+
+                payableCurrency:
+                    paymentMethod.toUpperCase()
+
+            }
+
+        });
+
+    }
+
+    catch (err) {
+
+        console.log(err);
+
+        return res.status(500).json({
+
+            success: false,
+
+            message: err.message
+
+        });
+
+    }
+
+});
+
+router.post("/product_payment_initialize", auth, async (req, res) => {
+    try {
+
+        const { productId } = req.body;
+
+        if (!productId) {
+            return res.status(400).json({
+                success: false,
+                message: "Product ID is required"
+            });
+        }
+
+        const product = await Product.findById(productId);
+
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                message: "Product not found"
+            });
+        }
+
+        if (
+            product.status !== "published" ||
+            product.visibility !== "public"
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Product unavailable"
+            });
+        }
+
+        const alreadyPurchased = await Purchase.findOne({
+            buyer: req.user._id,
+            product: product._id,
+            paymentStatus: "paid"
+        });
+
+        if (alreadyPurchased) {
+            return res.status(400).json({
+                success: false,
+                message: "You already own this product."
+            });
+        }
+
+        // FREE PRODUCT
+        if (product.pricing.type === "free") {
+
+            const purchase = await Purchase.create({
+                user: req.user._id,
+                seller: product.seller,
+                sellerType: "Seller",
+                item: product._id,
+                itemType: "Product",
+                amount: 0,
+                itemAmount: 0,
+                platformFee: 0,
+                sellerAmount: 0,
+                currency: "FREE",
+                paymentMethod: "free",
+                paymentStatus: "paid"
+            });
+
+            await Product.findByIdAndUpdate(product._id, {
+                $inc: {
+                    totalDownloads: 1
+                }
+            });
+
+            return res.json({
+                success: true,
+                free: true,
+                purchase
+            });
+        }
+
+        const originalAmount = product.pricing.amount;
+        const currency = product.pricing.currency;
+
+        let convertedAmount = originalAmount;
+        let exchangeRate = null;
+
+        if (currency === "USDT" || currency === "USD") {
+            exchangeRate = await fetchFXRates();
+            convertedAmount = originalAmount * exchangeRate;
+        }
+
+        const platformFee = convertedAmount * 0.10;
+
+        const finalAmount = Math.round(
+            convertedAmount + platformFee
+        );
+
+        const reference =
+            `BH_PRODUCT_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+
+        const purchase = await Purchase.create({
+            user: req.user._id,
+            seller: product.seller,
+            sellerType: "Seller",
+            item: product._id,
+            itemType: "Product",
+            amount: finalAmount,
+            itemAmount: convertedAmount,
+            platformFee,
+            sellerAmount: convertedAmount,
+            currency: "NGN",
+            paymentMethod: "paystack",
+            paymentReference: reference,
+            paymentStatus: "pending"
+        });
+
+        const response = await axios.post(
+            "https://api.paystack.co/transaction/initialize",
+            {
+                email: req.user.email,
+                amount: finalAmount * 100,
+                currency: "NGN",
+                reference,
+                callback_url: `${process.env.FRONTEND_URL}/product/payment/success`
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+                    "Content-Type": "application/json"
+                }
+            }
+        );
+
+        return res.json({
+            success: true,
+            pricing: {
+                originalAmount,
+                originalCurrency: currency,
+                exchangeRate,
+                convertedAmount,
+                platformFee,
+                total: finalAmount,
+                payableCurrency: "NGN"
+            },
+            authorization_url: response.data.data.authorization_url,
+            access_code: response.data.data.access_code,
+            reference
+        });
+
+    } catch (err) {
+
+        console.log(err.response?.data || err);
+
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+
+    }
+});
+
+router.get("/product_payment_verify", auth, async (req, res) => {
+    try {
+
+        const { reference } = req.query;
+
+        if (!reference) {
+            return res.status(400).json({
+                success: false,
+                message: "Payment reference is required"
+            });
+        }
+
+        const purchase = await Purchase.findOne({
+            itemType: "Product",
+            paymentReference: reference,
+            user: req.user._id
+        }).populate("item");
+
+        if (!purchase) {
+            return res.status(404).json({
+                success: false,
+                message: "Purchase not found"
+            });
+        }
+
+        if (purchase.paymentStatus === "paid") {
+            return res.json({
+                success: true,
+                alreadyVerified: true,
+                purchase
+            });
+        }
+
+        const verify = await axios.get(
+            `https://api.paystack.co/transaction/verify/${reference}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
+                }
+            }
+        );
+
+        const payment = verify.data.data;
+
+        if (payment.status !== "success") {
+
+            purchase.paymentStatus = "failed";
+            await purchase.save();
+
+            return res.status(400).json({
+                success: false,
+                message: "Payment not successful"
+            });
+
+        }
+
+        purchase.paymentStatus = "paid";
+        purchase.transactionHash = payment.reference;
+
+        await purchase.save();
+
+        await Product.findByIdAndUpdate(
+            purchase.item,
+            {
+                $inc: {
+                    totalSales: 1,
+                    totalDownloads: 1
+                }
+            }
+        );
+
+        await Seller.findByIdAndUpdate(
+            purchase.seller,
+            {
+                $inc: {
+                    pendingEarnings: purchase.sellerAmount,
+                    totalSales: 1
+                }
+            }
+        );
+
+        const updatedUser = await user.findByIdAndUpdate(
+            purchase.user,
+            {
+                $inc: {
+                    totalPurchases: 1,
+                    totalSpent: purchase.amount
+                }
+            },
+            { new: true }
+        );
+
+        console.log(updatedUser);
+        return res.json({
+            success: true,
+            message: "Payment verified",
+            purchase
+        });
+
+    } catch (err) {
+
+        console.log(err.response?.data || err);
+
+        return res.status(500).json({
+            success: false,
+            message: err.message
+        });
+
+    }
+});
 
 // module.exports = /;
 

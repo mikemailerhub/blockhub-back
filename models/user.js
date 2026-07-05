@@ -30,6 +30,16 @@ const userSchema = new mongoose.Schema({
 
     userFirstLogin: { type: Boolean, default: false },
 
+    isSeller: {
+        type: Boolean,
+        default: false,
+    },
+
+    sellerProfile: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "sellers",
+    },
+
     isTutor: { type: Boolean, default: false }, // NEW: quick flag
     tutorProfile: { type: mongoose.Schema.Types.ObjectId, ref: 'tutors' },
 
@@ -55,6 +65,15 @@ const userSchema = new mongoose.Schema({
         },
     },
 
+    totalPurchases: {
+        type: Number,
+        default: 0,
+    },
+
+    totalSpent: {
+        type: Number,
+        default: 0,
+    },
 
     source: { type: String, default: 'website' }, // track login source
 

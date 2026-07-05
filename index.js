@@ -130,11 +130,19 @@ app.use('/user_courses', require('./route_user/course'));
 app.use('/user_jobs', require('./route_user/jobs'));
 app.use('/user_wallet', require('./route_user/wallet'));
 app.use('/user_payment', require('./route_user/payment'));
+app.use('/user_market', require('./route_user/Market'));
+app.use('/user_purchase', require('./route_user/purchase'));
 
 // Tutor routes
 app.use('/tutor_auth', require('./route_tutor/auth'));
 app.use('/tutor_course', require('./route_tutor/course'));
 app.use('/tutor_dashboard', require('./route_tutor/dashboard'));
+
+
+// Tutor routes
+app.use('/seller_auth', require('./route_seller/auth'));
+app.use('/seller_product', require('./route_seller/product'));
+app.use('/seller_dashboard', require('./route_seller/dashboard'));
 
 // Admin routes
 app.use('/admin_tasks', require('./route_admin/task'));

@@ -168,26 +168,52 @@ router.get("/user_courses", verifyUser, async (req, res) => {
             });
 
         // split into active + completed
-        const active = enrollments.filter(e => !e.completed);
-        const completed = enrollments.filter(e => e.completed);
+        const validEnrollments = enrollments.filter(e => e.course);
+
+        const active = validEnrollments.filter(e => !e.completed);
+        const completed = validEnrollments.filter(e => e.completed);
 
         res.json({
-            active: active.map(e => ({
-                ...e,
-                isPaid: true,
-                course: e.course,
-                certificateStatus: e.certificateStatus,
-                certificateUrl: e.certificateUrl,
-                certificateIssuedAt: e.certificateIssuedAt,
-            })),
+            active: active.map(e => {
+                const enrollment = e.toObject();
 
-            completed: completed.map(e => ({
-                ...e,
-                course: e.course,
-                certificateStatus: e.certificateStatus,
-                certificateUrl: e.certificateUrl,
-                certificateIssuedAt: e.certificateIssuedAt,
-            })),
+                return {
+                    ...enrollment.course,
+                    courseId: enrollment.course._id,
+
+                    completedLessons: enrollment.completedLessons,
+                    totalLessons: enrollment.totalLessons,
+                    progress: enrollment.progress,
+                    completed: enrollment.completed,
+                    lastLessonIndex: enrollment.lastLessonIndex,
+
+                    certificateStatus: enrollment.certificateStatus,
+                    certificateUrl: enrollment.certificateUrl,
+                    certificateIssuedAt: enrollment.certificateIssuedAt,
+
+                    isPaid: true,
+                };
+            }),
+
+            completed: completed.map(e => {
+                const enrollment = e.toObject();
+
+                return {
+                    ...enrollment.course,
+                    courseId: enrollment.course._id,
+
+                    completedLessons: enrollment.completedLessons,
+                    totalLessons: enrollment.totalLessons,
+                    progress: enrollment.progress,
+                    completed: enrollment.completed,
+
+                    certificateStatus: enrollment.certificateStatus,
+                    certificateUrl: enrollment.certificateUrl,
+                    certificateIssuedAt: enrollment.certificateIssuedAt,
+
+                    isPaid: true,
+                };
+            }),
         });
 
     } catch (err) {

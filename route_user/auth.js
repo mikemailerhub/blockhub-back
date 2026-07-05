@@ -190,6 +190,7 @@ router.get("/me", auth, (req, res) => {
 
 router.post("/logout", (req, res) => {
   res.clearCookie("token");
+  res.clearCookie("tutorToken");
 
   res.json({
     success: true,
