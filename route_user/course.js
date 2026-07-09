@@ -96,6 +96,8 @@ router.get('/courses', async (req, res) => {
             isDraft: false,
             // tutor: { $ne: excludedTutorId } // 👈 EXCLUDE THIS TUTOR
         })
+
+        
             .populate({
                 path: 'tutor',
                 populate: {
