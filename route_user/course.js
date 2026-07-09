@@ -94,10 +94,10 @@ router.get('/courses', async (req, res) => {
         const courses = await Course.find({
             isPublished: true,
             isDraft: false,
-            // tutor: { $ne: excludedTutorId } // 👈 EXCLUDE THIS TUTOR
+            tutor: { $ne: excludedTutorId } // 👈 EXCLUDE THIS TUTOR
         })
 
-        
+
             .populate({
                 path: 'tutor',
                 populate: {
