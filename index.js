@@ -45,6 +45,7 @@ const allowedOrigins = [
     'https://app.blockhubglobal.xyz',
     'https://dashboard.blockhubglobal.xyz',
     'https://blockhubglobal.xyz',
+    'https://hk-launch-timecount.netlify.app',
     'http://172.20.10.4:5173/'
 ];
 
