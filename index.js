@@ -132,6 +132,7 @@ app.use('/user_wallet', require('./route_user/wallet'));
 app.use('/user_payment', require('./route_user/payment'));
 app.use('/user_market', require('./route_user/Market'));
 app.use('/user_purchase', require('./route_user/purchase'));
+app.use('/user_Hk', require('./route_user/Hk'));
 
 // Tutor routes
 app.use('/tutor_auth', require('./route_tutor/auth'));
