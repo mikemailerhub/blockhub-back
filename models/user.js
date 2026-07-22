@@ -23,9 +23,9 @@ const userSchema = new mongoose.Schema({
                                     totalProjectsCreated: {type: Number, default: 0}, 
                                     totalCampaignsJoined: {type: Number, default: 0}, 
                                     totalCampaignsCreated:{type: Number, default: 0}, 
-                                    totalRewardsEarned:   {type: Number, default: 0}, 
+                                    totalRewardsEarned:   {type: Number, default: 0},
+                                    activeCampaigns: { type: Number, default: 0 }, 
                                     totalTasksCompleted:  {type: Number, default: 0}, 
-                                    totalRewardsEarned:   {type: Number, default: 0}, 
                                 },      
 
     template_bought:            { type: Boolean, default: false },

@@ -30,6 +30,9 @@ const projectSchema = new mongoose.Schema(
                                 participants: { type: Number, default: 0 },
                                 completedTasks: { type: Number, default: 0 },
                                 rewardsPaid: { type: Number, default: 0 },
+                                activeCampaigns: { type: Number, default: 0 },
+                                submissions: { type: Number, default: 0 },
+                                views: { type: Number, default: 0 },
                             },
 
     verified:               { type: Boolean, default: false },

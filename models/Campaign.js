@@ -19,9 +19,8 @@ const campaignSchema = new mongoose.Schema(
 
     description:                { type: String, required: true },
 
-    banner:                     { type: String, default: "" },
+    banner:                     { url: String, publicId: String },
 
-    bannerPublicId:             { type: String, default: "" },
 
     //-----------------------------------
     // Campaign Configuration
@@ -35,12 +34,27 @@ const campaignSchema = new mongoose.Schema(
 
     endDate:                    { type: Date, required: true },
 
+
+    //-----------------------------------
+    // Campaign Requirement
+    //-----------------------------------
+    requirements:               {
+                                    required: {type: Boolean, default: true},
+                                    walletRequired: {type: Boolean, default: false},
+                                    submissionUrlRequired: {type: Boolean, default: false},
+                                    screenshotRequired: {type: Boolean, default: false},
+                                    oneSubmissionPerWallet: {type: Boolean, default: true},
+                                    oneSubmissionPerUser: {type: Boolean, default: true},
+                                    minFollowers: {type: Number, default: 0},
+                                    minAccountAge: {type: Number, default: 0},
+                                },
+
     //-----------------------------------
     // Reward
     //-----------------------------------
 
     reward:                     {
-                                    type: {  type: String, enum: ["fixed", "pool"],  efault: "fixed",  },
+                                    type: {  type: String, enum: ["fixed", "pool"],  default: "fixed",  },
 
                                     currency: { type: String, enum: ["USDT", "BNB", "ETH", "AVAX", "POINTS"],    default: "USDT", },
 

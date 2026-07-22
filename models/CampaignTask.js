@@ -37,6 +37,11 @@ const campaignTaskSchema = new mongoose.Schema(
 
     order:                      { type: Number, default: 1 },
 
+    reward:                     {
+                                    amount: {type:Number,default: 0},
+                                    currency: {type: String, enum: ["USDT","BNB","ETH","AVAX","POINTS"], default: "USDT"}
+                                },
+
     verification:               {
                                         type: String,
                                         enum: ["automatic", "manual"],
