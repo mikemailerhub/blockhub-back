@@ -58,7 +58,6 @@ route.post('/upload_portfolio', uploader.single('file'), async(req, res) => {
             portfolioUrl: result.secure_url,
             portfolioPublicId: result.public_id,
             portfolio: true,
-            userFirstLogin: true
 
         });
 

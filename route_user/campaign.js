@@ -146,7 +146,7 @@ router.post("/create", auth, async (req, res) => {
             slug,
             description,
             banner,
-            
+
             hashtags,
             startDate,
             endDate,
@@ -231,7 +231,6 @@ router.post("/create", auth, async (req, res) => {
 
     }
 });
-
 
 router.put("/update/:campaignId", auth, async (req, res) => {
     try {
@@ -366,7 +365,6 @@ router.put("/update/:campaignId", auth, async (req, res) => {
 
     }
 });
-
 
 router.post("/duplicate/:campaignId", auth, async (req, res) => {
     try {
@@ -513,7 +511,6 @@ router.post("/duplicate/:campaignId", auth, async (req, res) => {
 
     }
 });
-
 
 router.delete("/delete/:campaignId", auth, async (req, res) => {
     try {
@@ -752,7 +749,7 @@ router.post("/join/:campaignId", auth, async (req, res) => {
         // Campaign Status
         //----------------------------------
 
-     
+
 
         const now = new Date();
 

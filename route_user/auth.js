@@ -125,7 +125,6 @@ router.get('/auth/twitter/callback', async (req, res) => {
       { twitterId: id },
       {
         ...twitterData,
-        userFirstLogin: true,
         source: userSource,
       },
       { new: true, upsert: true }
