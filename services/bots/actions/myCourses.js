@@ -1,5 +1,5 @@
 const User = require("../../../models/user");
-const Enrollment = require("../../../models/enrollment");
+const Enrollment = require("../../../models/Enrollment");
 
 module.exports = (bot) => {
 

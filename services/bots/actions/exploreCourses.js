@@ -1,4 +1,4 @@
-const Course = require("../../../models/course");
+const Course = require("../../../models/Course");
 
 module.exports = (bot) => {
 
