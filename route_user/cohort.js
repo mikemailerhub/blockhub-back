@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const User = require("../models/User");
+const User = require("../models/user");
 
 // Change this to wherever your auth middleware lives
 const  CohortRegistration = require("../models/Cohort");
