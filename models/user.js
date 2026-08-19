@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
     fullName:                   { type: String },
-    twitterHandle:              { type: String, unique: true, required: true },
-    twitterId:                  { type: String, unique: true, required: true },
+    twitterHandle:              { type: String, unique: true,sparse: true,default: null  },
+    twitterId:                  { type: String, unique: true, sparse: true,default: null },
     email:                      { type: String, default: null },
     profileImage:               { type: String, default: null },
     verified:                   { type: Boolean, default: false },
@@ -70,6 +70,13 @@ const userSchema = new mongoose.Schema({
     appliedJobs:                [{ type: mongoose.Schema.Types.ObjectId, ref: 'jobs' }],
 
     emailSent:                  { type: Boolean, default: false },
+
+    telegram:                   {
+                                    id: { type: String, default: null, unique: true, sparse: true },
+                                    username: { type: String, default: null },
+                                    firstName: { type: String, default: null },
+                                    linkedAt: { type: Date, default: null }
+                                }
 }, {
     timestamps: true,
     collection: 'users'

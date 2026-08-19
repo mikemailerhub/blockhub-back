@@ -13,8 +13,6 @@ const auth = require('../middlewave/auth');
 
 
 
-
-
 router.post('/get_user_interest', async (req, res) => {
     try {
         const { token } = req.body;
@@ -34,6 +32,7 @@ router.post('/get_user_interest', async (req, res) => {
         return res.status(500).json({ message: 'Server error' });
     }
 });
+
 
 router.post('/edit_interest', async (req, res) => {
     const { token, interest } = req.body;
@@ -295,7 +294,6 @@ router.post('/resolve_account', async (req, res) => {
 
     }
 })
-
 
 router.post("/save_account", auth, async (req, res) => {
     try {

@@ -1,140 +1,198 @@
-const nodemailer = require('nodemailer');
-const { usersP } = require('./paystack_customers');
+const nodemailer = require("nodemailer");
+const getAllEmailUsers = require("./getAllEmailUsers");
 
-// 1️⃣ The email you want to exclude (already tested)
-const excludeEmail = "danieldaudu65@gmail.com";
+// ============================================================
+// TEST MODE
+// ============================================================
 
-// 2️⃣ Filter usersP to remove the excluded email and remove duplicates
-const uniqueEmailsMap = new Map();
-
-for (let u of usersP) {
-  const email = u.email.toLowerCase(); // normalize
-  if (email !== excludeEmail.toLowerCase() && !uniqueEmailsMap.has(email)) {
-    uniqueEmailsMap.set(email, { email: u.email, name: "Friend" });
-  }
-}
-const TEST_MODE = false; // change to false when ready
-
-// 3️⃣ Convert map to array
-// 🔥 TEST MODE — send only to excluded email
-const allUsers = Array.from(uniqueEmailsMap.values());
-
-const users = TEST_MODE
-  ? [{ email: excludeEmail, name: "Daniel" }, { email: "01jesusbaby@gmail.com", name: "Daniel" }]
-  : allUsers;
+// false = send to all combined users
+// true  = send only to the test emails below
+const TEST_MODE = false;
 
 
-console.log("Users after filtering:", users);
+// ============================================================
+// TEST EMAILS
+// ============================================================
 
-// Arrays to track sent and failed emails
+const testUsers = [
+  {
+    email: "danieldaudu65@gmail.com",
+    name: "Daniel",
+  },
+
+  {
+    email: "gbadeboprecious113@gmail.com",
+    name: "Daniel",
+  },
+];
+
+
+// ============================================================
+// ARRAYS TO TRACK EMAILS
+// ============================================================
+
 const sentUsers = [];
 const failedUsers = [];
 
-// 2️⃣ Nodemailer transporter (Gmail)
+
+// ============================================================
+// NODEMAILER TRANSPORTER
+// ============================================================
+
 const transporter = nodemailer.createTransport({
+
   host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
+  port: 465,
+  secure: true,
+
   auth: {
     user: "block.hub.mailer@gmail.com",
-    pass: "fdyq nopf aqhi hfaf"
-  }
+    pass: "raay ufip eira unic",
+  },
+
 });
 
-// 3️⃣ Email content
-const subject = '🚀 BlockHub Academy Launches This March — 1,000 Free Seats';
+
+// ============================================================
+// EMAIL SUBJECT
+// ============================================================
+
+const subject =
+  "🚀 BlockHub Cohort 1.0 Is Coming";
+
+
+// ============================================================
+// EMAIL CONTENT
+// ============================================================
 
 const htmlMessage = `
-<div style="background:#fff;padding:12px 0;">
-  <div style="
-    max-width:640px;
-    margin:0 auto;
-    background:#ffffff;
-    padding:22px;
-    border-radius:14px;
-    font-family:Arial, sans-serif;
-    color:#000000;
-    box-shadow:0 16px 40px rgba(0,0,0,0.08);
-  ">
 
-    <!-- Logo -->
-    <div style="text-align:center;margin-bottom:24px;">
-      <img src="https://res.cloudinary.com/dd7faellv/image/upload/v1770282650/emails/xdnzuqipyjjnjpsvx1ea.jpg" alt="BlockHub" style="max-width:100%;border-radius:8px;" />
-    </div>
+<div style="
+    background:#fff;
+    padding:12px 0;
+">
 
-    <p style="font-size:15px;">
-      GM BlockHub Family,
-    </p>
+    <div style="
+        max-width:640px;
+        margin:0 auto;
+        background:#ffffff;
+        padding:22px;
+        border-radius:14px;
+        font-family:Arial, sans-serif;
+        color:#000000;
+        box-shadow:0 16px 40px rgba(0,0,0,0.08);
+    ">
 
-    <p style="font-size:14px;">
-      It's another week of learning, connecting, and accumulating information.
-    </p>
 
-    <p style="font-size:16px;font-weight:600;margin-top:10px;">
-      Here's what's cooking in the Hub:
-    </p>
+        <!-- Logo -->
 
-    <p style="font-size:16px;font-weight:600;margin-top:18px;">
-      BlockHub Academy: Calling all Founding Educators
-    </p>
-
-    <p style="font-size:14px;margin-top:12px;">
-      BlockHub Academy is more than just a learning platform; it's a self-sustaining flywheel:
-    </p>
-
-    <p style="font-size:14px;margin-top:12px;">
-      If you have battle-tested expertise, now is your chance to:
-    </p>
-
-    <ul style="font-size:14px;margin-top:12px;padding-left:18px;line-height:1.6;">
-      <li> Own your content</li>
-      <li> Build your brand</li>
-      <li> Revenue Share</li>
-      <li> Shape the future</li>
-    </ul>
-
-    <p style="font-size:16px;font-weight:600;margin-top:18px;">
-      What happens next at BlockHub?
-    </p>
-
-    <ul style="font-size:14px;margin-top:12px;padding-left:18px;line-height:1.6;">
-      <li> Community calls and X Spaces (keep alerts turned on for @Block_hubV2)</li>
-      <li> Upcoming AMA Space on Saturday by 6pm</li>
-    </ul>
-
-    <p style="font-size:14px;margin-top:12px;">
-      https://x.com/web3xamals/status/2031355692292964560
-    </p>
-
-    <p style="font-size:14px;margin-top:12px;">
-      Do well to set a reminder so you don’t miss it.
-    </p>
-
-    <p style="font-size:14px;margin-top:12px;">
-      • New income opportunities are emerging with our partners.
-    </p>
-
-    <p style="font-size:14px;margin-top:16px;">
-      If you're working on something great or simply looking for a place to hang out, our direct messages are always open.
-    </p>
-
-    <!-- CTA Buttons -->
-    <div style="margin-top:24px;text-align:center;">
-      <a href="https://blockhubglobal.xyz/academy/waitlist"
-        style="
-          display:block;
-          width:100%;
-          margin-bottom:12px;
-          padding:14px 0;
-          text-decoration:none;
-          color:#ffffff;
-          font-size:13px;
-          font-weight:600;
-          background:linear-gradient(135deg,#16a34a,#020617);
-          border-radius:10px;
+        <div style="
+            text-align:center;
+            margin-bottom:24px;
         ">
-        JOIN THE WAITLIST
-      </a>
+
+            <img
+                src="https://res.cloudinary.com/dd7faellv/image/upload/v1786722510/photo_2026-08-14_16-46-58_pvjbxl.jpg"
+                alt="BlockHub"
+                style="
+                    max-width:100%;
+                    border-radius:8px;
+                "
+            />
+
+        </div>
+
+
+        <!-- Greeting -->
+
+        <p style="
+            font-size:15px;
+            margin-bottom:18px;
+        ">
+
+            Hello BlockHubber 👋
+
+        </p>
+
+
+        <!-- Main Heading -->
+
+        <p style="node 
+            font-size:16px;
+            line-height:1.3;
+            margin:0 0 20px;
+            font-weight:700;
+        ">
+
+            🚀 BlockHub Cohort 1.0 Is Coming
+
+        </h1>
+
+
+        <!-- Message -->
+
+        <p style="
+            font-size:14px;
+            line-height:1.7;
+            margin-top:12px;
+        ">
+
+            Something exciting is coming to BlockHub.
+
+        </p>
+
+
+        <p style="
+            font-size:14px;
+            line-height:1.7;
+            margin-top:12px;
+        ">
+
+            We’re getting ready to launch
+            <strong>BlockHub Cohort 1.0</strong>,
+            a free learning experience designed to bring people together to
+            learn, grow, and explore new opportunities.
+
+        </p>
+
+
+        <p style="
+            font-size:14px;
+            line-height:1.7;
+            margin-top:12px;
+        ">
+
+            Participants in Cohort 1.0 will also get access to
+            <strong>
+                additional free packages, useful tools, and other resources
+            </strong>
+            along the way.
+
+        </p>
+
+
+        <p style="
+            font-size:14px;
+            line-height:1.7;
+            margin-top:12px;
+        ">
+
+            Be part of
+            <strong>BlockHub Cohort 1.0</strong>
+            as more details will be revealed soon.
+
+        </p>
+
+
+        <!-- CTA -->
+
+       
+
+
+        <!-- Social Buttons -->
+
+         <div style="margin-top:24px;text-align:center;">
+     
 
       <a href="https://x.com/Block_hubV2"
         style="
@@ -167,44 +225,276 @@ const htmlMessage = `
       </a>
     </div>
 
-  </div>
-</div>
-`;
-// 4️⃣ Send emails
-async function sendTestEmail() {
-  for (let user of users) {
-    const mailOptions = {
-      from: '"BlockHub" <block.hub.mailer@gmail.com>',
-      to: user.email,
-      subject: subject,
-      html: htmlMessage.replace('{{name}}', user.name),
-    };
 
-    try {
-      await transporter.sendMail(mailOptions);
-      console.log(`Email sent to ${user.email}`);
-      sentUsers.push(user.email);
-    } catch (err) {
-      console.error(`Failed to send to ${user.email}:`, err);
-      failedUsers.push(user.email);
+        <!-- Footer -->
+
+        <p style="
+            font-size:12px;
+            line-height:1.6;
+            color:#666666;
+            text-align:center;
+            margin-top:28px;
+        ">
+
+            More details about BlockHub Cohort 1.0 will be revealed soon.
+            Stay connected. 🚀
+
+        </p>
+
+
+    </div>
+
+</div>
+
+`;
+
+
+// ============================================================
+// SEND EMAILS
+// ============================================================
+
+async function sendTestEmail() {
+
+  try {
+
+    // ==========================================
+    // GET ALL USERS
+    // ==========================================
+
+    let users;
+
+
+    if (TEST_MODE) {
+
+      users = testUsers;
+
+    } else {
+
+      users =
+        await getAllEmailUsers();
+
     }
 
-    // Optional: small delay to avoid Gmail throttling
-    await new Promise(r => setTimeout(r, 1500));
+
+    // ==========================================
+    // CHECK USERS
+    // ==========================================
+
+    if (!users || users.length === 0) {
+
+      console.log(
+        "❌ No users with email addresses found."
+      );
+
+      return;
+
+    }
+
+
+    console.log(
+      "=========================================="
+    );
+
+    console.log(
+      `📨 Total users to email: ${users.length}`
+    );
+
+    console.log(
+      "=========================================="
+    );
+
+
+    // ==========================================
+    // SEND EMAILS
+    // ==========================================
+
+    for (const user of users) {
+
+      const mailOptions = {
+
+        from:
+          '"BlockHub" <block.hub.mailer@gmail.com>',
+
+        to:
+          user.email,
+
+        subject:
+          subject,
+
+        html:
+          htmlMessage.replace(
+            "{{name}}",
+            user.name || "BlockHubber"
+          ),
+
+      };
+
+
+      try {
+
+        await transporter.sendMail(
+          mailOptions
+        );
+
+
+        console.log(
+          `✅ Email sent to ${user.email}`
+        );
+
+
+        sentUsers.push(
+          user.email
+        );
+
+
+      } catch (err) {
+
+        console.error(
+          `❌ Failed to send to ${user.email}:`,
+          err.message
+        );
+
+
+        failedUsers.push(
+          user.email
+        );
+
+      }
+
+
+      // ==========================================
+      // SMALL DELAY
+      // ==========================================
+
+      await new Promise(
+        resolve =>
+          setTimeout(resolve, 1500)
+      );
+
+    }
+
+
+    // ==========================================
+    // SUMMARY
+    // ==========================================
+
+    console.log(
+      "=========================================="
+    );
+
+    console.log(
+      `📊 Total users: ${users.length}`
+    );
+
+    console.log(
+      `✅ Successfully sent: ${sentUsers.length}`
+    );
+
+    console.log(
+      `❌ Failed: ${failedUsers.length}`
+    );
+
+    console.log(
+      "=========================================="
+    );
+
+
+    // ==========================================
+    // SEND SUMMARY TO YOURSELF
+    // ==========================================
+
+    await transporter.sendMail({
+
+      from:
+        '"BlockHub" <block.hub.mailer@gmail.com>',
+
+      to:
+        "danieldaudu65@gmail.com",
+
+      subject:
+        "📧 BlockHub Cohort Email Summary",
+
+      html: `
+
+                <div
+                    style="
+                        font-family:Arial,sans-serif;
+                        padding:20px;
+                    "
+                >
+
+                    <h2>
+                        📧 BlockHub Email Campaign Summary
+                    </h2>
+
+                    <p>
+                        👥 <strong>Total users:</strong>
+                        ${users.length}
+                    </p>
+
+                    <p>
+                        ✅ <strong>Successfully sent:</strong>
+                        ${sentUsers.length}
+                    </p>
+
+                    <p>
+                        ❌ <strong>Failed:</strong>
+                        ${failedUsers.length}
+                    </p>
+
+
+                    <hr>
+
+
+                    <h3>
+                        ✅ Sent Emails
+                    </h3>
+
+                    <p>
+                        ${sentUsers.length
+          ? sentUsers.join("<br>")
+          : "None"
+        }
+                    </p>
+
+
+                    <h3>
+                        ❌ Failed Emails
+                    </h3>
+
+                    <p>
+                        ${failedUsers.length
+          ? failedUsers.join("<br>")
+          : "None"
+        }
+                    </p>
+
+                </div>
+
+            `,
+
+    });
+
+
+    console.log(
+      "📧 Summary email sent successfully."
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "❌ Email campaign failed:",
+      error
+    );
+
   }
 
-  // 5️⃣ Send summary to yourself after loop
-  await transporter.sendMail({
-    from: '"BlockHub" <block.hub.mailer@gmail.com>',
-    to: 'danieldaudu65@gmail.com', // <-- replace with your real email
-    subject: '📧 Email Sending Summary',
-    html: `
-            <p>✅ Sent to: ${sentUsers.join(', ')}</p>
-            <p>❌ Failed to send to: ${failedUsers.join(', ')}</p>
-        `
-  });
-  console.log('Summary email sent to yourself');
 }
 
-// Run the function
+
+// ============================================================
+// RUN
+// ============================================================
+
 sendTestEmail();

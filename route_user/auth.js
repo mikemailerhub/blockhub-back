@@ -11,6 +11,10 @@ const auth = require('../middlewave/auth');
 const sanitizeUser = require('../utils/sanitizeUser');
 const router = express.Router();
 
+const TelegramConnection = require('../models/telegramConnection');
+
+const bot = require("../services/bots/telegramBot");
+
 // Initialize Twitter client (OAuth2 PKCE)
 const twitterClient = new TwitterApi({
   clientId: process.env.TWITTER_CLIENT_ID,
@@ -43,12 +47,344 @@ async function hasUserPaidPaystack(email) {
   }
 }
 
+
+
+// ============================================================
+// TELEGRAM CONNECT
+// ============================================================
+//
+// The user MUST already be authenticated.
+// auth middleware reads the JWT from the cookie.
+// The Telegram token identifies the Telegram account.
+// ============================================================
+
+router.post('/telegram/connect', auth, async (req, res) => {
+
+  try {
+
+    // ==========================================
+    // Get token sent from frontend
+    // ==========================================
+
+    const { token } = req.body;
+
+    if (!token) {
+
+      return res.status(400).json({
+        success: false,
+        message: 'Telegram connection token is required.',
+      });
+
+    }
+
+
+    // ==========================================
+    // Get authenticated BlockHub user
+    // ==========================================
+
+    const userId = req.user._id;
+
+    console.log(
+      'Telegram connection requested by user:',
+      userId.toString()
+    );
+
+
+    // ==========================================
+    // Hash incoming token
+    // ==========================================
+
+    const crypto = require('crypto');
+
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+
+    // ==========================================
+    // Find Telegram connection
+    // ==========================================
+
+    const connection =
+      await TelegramConnection.findOne({
+        tokenHash,
+        used: false,
+        expiresAt: {
+          $gt: new Date(),
+        },
+      });
+
+
+    if (!connection) {
+
+      return res.status(400).json({
+        success: false,
+        message:
+          'Invalid or expired Telegram connection token.',
+      });
+
+    }
+
+
+    // ==========================================
+    // Check if this Telegram account is already
+    // connected to another BlockHub account
+    // ==========================================
+
+    const existingTelegramUser =
+      await user.findOne({
+        'telegram.id': connection.telegramId,
+      });
+
+
+    if (
+      existingTelegramUser &&
+      existingTelegramUser._id.toString() !==
+      userId.toString()
+    ) {
+
+      return res.status(409).json({
+        success: false,
+        message:
+          'This Telegram account is already connected to another BlockHub account.',
+      });
+
+    }
+
+
+    // ==========================================
+    // Connect Telegram to current BlockHub user
+    // ==========================================
+
+    const updatedUser =
+      await user.findByIdAndUpdate(
+        userId,
+        {
+          telegram: {
+            id: connection.telegramId,
+            username:
+              connection.telegramUsername,
+            firstName:
+              connection.telegramFirstName,
+            linkedAt: new Date(),
+          },
+        },
+        {
+          new: true,
+        }
+      );
+
+
+    if (!updatedUser) {
+
+      return res.status(404).json({
+        success: false,
+        message: 'BlockHub user not found.',
+      });
+
+    }
+
+
+    // ==========================================
+    // SEND SUCCESS MESSAGE TO TELEGRAM
+    // =========================================
+
+    try {
+
+      await bot.telegram.sendMessage(
+        connection.telegramId,
+
+        `🎉 <b>BlockHub Account Connected!</b>\n\n` +
+
+        `Your Telegram account is now successfully connected to your BlockHub account.\n\n` +
+
+        `You're all set and ready to <b>join, participate, earn points, climb the leaderboard, discover opportunities and earn rewards</b> across the BlockHub ecosystem.\n\n` +
+
+        `🤖 <b>Your Personal Agent is ready.</b>\n\n` +
+
+        `You can now use Agentic BlockBot to interact with the BlockHub ecosystem directly from Telegram.\n\n` +
+
+        `👉 Use <code>/help</code> anytime to see what you can do.\n\n` +
+
+        `Welcome to the ecosystem, BlockHubber. 🚀`,
+
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "🤖 Open My Agent",
+                  callback_data: "agent_home",
+                },
+              ],
+              [
+                {
+                  text: "❓ How It Works",
+                  callback_data: "agent_help",
+                },
+              ],
+            ],
+          },
+        }
+      );
+
+    } catch (telegramError) {
+
+      // Don't fail the account connection
+      // just because Telegram notification failed.
+
+      console.error(
+        "Telegram success message error:",
+        telegramError
+      );
+
+    }
+
+
+
+    // ==========================================
+    // Mark token as used
+    // ==========================================
+
+    connection.used = true;
+
+    await connection.save();
+
+
+    console.log(
+      `Telegram ${connection.telegramId} connected to BlockHub user ${userId}`
+    );
+
+
+    // ==========================================
+    // SUCCESS
+    // ==========================================
+
+    return res.status(200).json({
+
+      success: true,
+
+      message:
+        'Telegram account connected successfully.',
+
+      telegram: {
+        id: connection.telegramId,
+        username:
+          connection.telegramUsername,
+        firstName:
+          connection.telegramFirstName,
+      },
+
+      user: sanitizeUser(updatedUser),
+
+    });
+
+  } catch (error) {
+
+    console.error(
+      'Telegram connect error:',
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        'Unable to connect Telegram account.',
+    });
+
+  }
+
+});
+
+
+// ============================================================
+// TELEGRAM DISCONNECT
+// ============================================================
+//
+// TESTING ENDPOINT
+//
+// This requires authentication so random people cannot
+// disconnect Telegram accounts.
+//
+// Later we can remove this or restrict it to admins.
+// ============================================================
+
+router.post('/telegram/disconnect', auth, async (req, res) => {
+
+  try {
+
+    const userId = req.user._id;
+
+    const updatedUser =
+      await user.findByIdAndUpdate(
+        userId,
+        {
+          $set: {
+            'telegram.id': null,
+            'telegram.username': null,
+            'telegram.firstName': null,
+            'telegram.linkedAt': null,
+          },
+        },
+        {
+          new: true,
+        }
+      );
+
+
+    if (!updatedUser) {
+
+      return res.status(404).json({
+        success: false,
+        message: 'User not found.',
+      });
+
+    }
+
+
+    console.log(
+      `Telegram disconnected from user ${userId}`
+    );
+
+
+    return res.status(200).json({
+
+      success: true,
+
+      message:
+        'Telegram account disconnected successfully.',
+
+      user: sanitizeUser(updatedUser),
+
+    });
+
+  } catch (error) {
+
+    console.error(
+      'Telegram disconnect error:',
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        'Unable to disconnect Telegram account.',
+    });
+
+  }
+
+});
+
+
+
 // ==========================
 // Step 1: Redirect to Twitter login
 // ==========================
 router.get('/auth/twitter', async (req, res) => {
   try {
-    const { source } = req.query;
+    const { source, telegramToken } = req.query;
     const { url, codeVerifier, state } = twitterClient.generateOAuth2AuthLink(
       redirectUri,
       {
@@ -61,7 +397,7 @@ router.get('/auth/twitter', async (req, res) => {
       }
     );
 
-    await twitterOAuth.create({ state, codeVerifier, role: 'user', source });
+    await twitterOAuth.create({ state, codeVerifier, role: 'user', source, telegramToken: source === 'telegram' ? telegramToken : null });
 
     console.log('Redirecting User to Twitter login URL:', url);
     res.redirect(url);
@@ -83,6 +419,7 @@ router.get('/auth/twitter/callback', async (req, res) => {
     if (!record) return res.redirect(`${process.env.FRONTEND_URL}`);
 
     const userSource = record.source || 'website';
+    const telegramToken = record.telegramToken;
     console.log(userSource);
 
 
@@ -150,25 +487,34 @@ router.get('/auth/twitter/callback', async (req, res) => {
     let redirectBase = '';
 
     switch (userSource) {
+
       case 'academy':
         redirectBase = `${frontendUrl}/academy/waitlist`;
         break;
+
       case 'website':
         redirectBase = `${frontendUrl}/profile`;
         break;
+
       case 'marketplace':
         redirectBase = `${frontendUrl}/market`;
         break;
+
       case 'continueAcademy':
         redirectBase = `${frontendUrl}/dashboard`;
         break;
+
       case 'newAcademy':
         redirectBase = `${frontendUrl}/academy/courses`;
         break;
+
+      case 'telegram':
+        redirectBase = `${frontendUrl}/connect-telegram`;
+        break;
+
       default:
         redirectBase = frontendUrl;
     }
-
 
     res.redirect(`${redirectBase}?token=${token}&user=${encodedUser}`);
 

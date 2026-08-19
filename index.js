@@ -97,6 +97,14 @@ mongoose.connect(process.env.MONGODB_URI)
     })
     .catch(err => console.error('MongoDB connection error:', err));
 
+
+    const telegramBot = require("./services/bots/telegramBot");
+
+telegramBot.launch();
+
+console.log("🤖 Telegram bot started");
+
+
 // ===============================
 // Serve static uploads (if needed)
 // ===============================
@@ -137,6 +145,7 @@ app.use('/user_Hk', require('./route_user/Hk'));
 app.use('/user_ai', require('./route_user/ai'));
 app.use('/user_project', require('./route_user/project'));
 app.use('/user_campaign', require('./route_user/campaign'));
+app.use('/user_cohort', require('./route_user/cohort'));
 
 // Tutor routes
 app.use('/tutor_auth', require('./route_tutor/auth'));
@@ -172,7 +181,7 @@ const streamifier = require('streamifier');
 cloudinary.config({
     cloud_name: process.env.CLOUD_NAME,
     api_key: process.env.API_KEY,
-    api_secret: process.env.API_SECRET
+    api_secret: process.env.API_SECREaT
 });
 
 // Memory storage for Multer
@@ -181,8 +190,6 @@ const upload = multer({
     storage,
     limits: { fileSize: 100 * 1024 * 1024 } // 50MB
 });
-
-
 
 
 app.post('/upload', upload.single('file'), async (req, res) => {
@@ -223,7 +230,6 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         res.status(500).json({ error: 'Upload failed' });
     }
 });
-
 
 app.delete("/delete-file", async (req, res) => {
     try {

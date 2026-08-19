@@ -915,6 +915,8 @@ router.get("/my-campaigns", auth, async (req, res) => {
         // Build Response
         //----------------------------------
 
+
+
         const campaigns = await Promise.all(
 
             participants.map(async (participant) => {
@@ -925,6 +927,12 @@ router.get("/my-campaigns", auth, async (req, res) => {
                     campaign: participant.campaign._id,
                 }).sort({ order: 1 });
 
+                const submissions = await CampaignSubmission.find({
+                    campaign: participant.campaign._id,
+                    user: userId,
+                })
+                    .populate("task", "title type reward")
+                    .sort({ createdAt: -1 });
                 return {
                     ...participant.campaign.toObject(),
 
@@ -939,11 +947,17 @@ router.get("/my-campaigns", auth, async (req, res) => {
                     },
 
                     tasks,
+                    submissions,
                 };
 
             })
 
         );
+
+
+
+
+
 
         //----------------------------------
         // Remove deleted campaigns
@@ -971,6 +985,244 @@ router.get("/my-campaigns", auth, async (req, res) => {
 
     }
 });
+
+router.post("/submit-task", auth, async (req, res) => {
+    try {
+
+        const userId = req.user.id;
+
+        const {
+            campaignId,
+            taskId,
+            submission = {},
+        } = req.body;
+
+        //----------------------------------
+        // Validate Input
+        //----------------------------------
+
+        if (!campaignId || !taskId) {
+            return res.status(400).json({
+                success: false,
+                message: "Campaign ID and Task ID are required.",
+            });
+        }
+
+        //----------------------------------
+        // Find Campaign
+        //----------------------------------
+
+        const campaign = await Campaign.findById(campaignId);
+
+        if (!campaign) {
+            return res.status(404).json({
+                success: false,
+                message: "Campaign not found.",
+            });
+        }
+
+        //----------------------------------
+        // Check Campaign Status
+        //----------------------------------
+
+        const now = new Date();
+
+        if (now < campaign.startDate) {
+            return res.status(400).json({
+                success: false,
+                message: "Campaign has not started yet.",
+            });
+        }
+
+        if (now > campaign.endDate) {
+            return res.status(400).json({
+                success: false,
+                message: "Campaign has ended.",
+            });
+        }
+
+        if (
+            ["paused", "cancelled", "completed"].includes(
+                campaign.status
+            )
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: `Campaign is currently ${campaign.status}.`,
+            });
+        }
+
+        //----------------------------------
+        // Find Task
+        //----------------------------------
+
+        const task = await CampaignTask.findOne({
+            _id: taskId,
+            campaign: campaignId,
+        });
+
+        if (!task) {
+            return res.status(404).json({
+                success: false,
+                message: "Task not found in this campaign.",
+            });
+        }
+
+        //----------------------------------
+        // Find Participant
+        //----------------------------------
+
+        const participant = await CampaignParticipant.findOne({
+            campaign: campaignId,
+            user: userId,
+        });
+
+        if (!participant) {
+            return res.status(403).json({
+                success: false,
+                message: "You must join this campaign before submitting a task.",
+            });
+        }
+
+        //----------------------------------
+        // Validate Submission
+        //----------------------------------
+
+        const text = submission.text?.trim() || "";
+        const url = submission.url?.trim() || "";
+        const screenshot = submission.screenshot?.trim() || "";
+        const wallet = submission.wallet?.trim() || "";
+
+        const requirements = campaign.requirements || {};
+
+        // if (requirements.submissionUrlRequired && !url) {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: "A submission URL is required.",
+        //     });
+        // }
+
+        // if (requirements.screenshotRequired && !screenshot) {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: "A screenshot is required.",
+        //     });
+        // }
+
+        // if (requirements.walletRequired && !wallet) {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: "A wallet address is required.",
+        //     });
+        // }
+
+        //----------------------------------
+        // Check Existing Submission
+        //----------------------------------
+
+        const existingSubmission = await CampaignSubmission.findOne({
+            campaign: campaignId,
+            task: taskId,
+            user: userId,
+        });
+
+        if (existingSubmission) {
+
+            if (requirements.oneSubmissionPerUser) {
+                return res.status(400).json({
+                    success: false,
+                    message: "You have already submitted this task.",
+                    submission: existingSubmission,
+                });
+            }
+        }
+
+        //----------------------------------
+        // Check Wallet Submission
+        //----------------------------------
+
+        if (
+            wallet &&
+            requirements.oneSubmissionPerWallet
+        ) {
+
+            const walletSubmission =
+                await CampaignSubmission.findOne({
+                    campaign: campaignId,
+                    task: taskId,
+                    "submission.wallet": wallet,
+                });
+
+            if (walletSubmission) {
+                return res.status(400).json({
+                    success: false,
+                    message: "This wallet has already submitted this task.",
+                });
+            }
+        }
+
+        //----------------------------------
+        // Create Submission
+        //----------------------------------
+
+        const newSubmission =
+            await CampaignSubmission.create({
+
+                campaign: campaignId,
+
+                task: taskId,
+
+                participant: participant._id,
+
+                user: userId,
+
+                submission: {
+                    text,
+                    url,
+                    screenshot,
+                    wallet,
+                },
+
+                status: "pending",
+
+            });
+
+        //----------------------------------
+        // Update Campaign Stats
+        //----------------------------------
+
+        await Campaign.findByIdAndUpdate(
+            campaignId,
+            {
+                $inc: {
+                    "stats.submissions": 1,
+                },
+            }
+        );
+
+        //----------------------------------
+        // Success
+        //----------------------------------
+
+        return res.status(201).json({
+            success: true,
+            message: "Task submitted successfully.",
+            submission: newSubmission,
+        });
+
+    } catch (error) {
+
+        console.error("Submit Task Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to submit task.",
+        });
+
+    }
+});
+
+
 
 
 
