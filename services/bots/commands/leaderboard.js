@@ -761,7 +761,6 @@ module.exports = (bot) => {
                     {
                         parse_mode: "HTML",
                     }
-
                 );
 
             }
