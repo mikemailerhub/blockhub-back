@@ -747,6 +747,7 @@ bot.action("settings_reset_points", async (ctx) => {
             {
                 parse_mode: "HTML",
 
+                
                 reply_markup: {
                     inline_keyboard: [
                         [
