@@ -718,253 +718,253 @@ module.exports = (bot) => {
     );
 
     // ==========================================
-// RESET POINTS — CONFIRMATION
-// ==========================================
+    // RESET POINTS — CONFIRMATION
+    // ==========================================
 
-bot.action("settings_reset_points", async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
-
-        const adminId = ctx.from.id;
-
-        // ==========================================
-        // SHOW CONFIRMATION
-        // ==========================================
-
-        await ctx.telegram.editMessageText(
-            adminId,
-            ctx.callbackQuery.message.message_id,
-            undefined,
-
-            `⚠️ <b>RESET LEADERBOARD</b>\n\n` +
-
-            `Are you sure you want to reset the leaderboard?\n\n` +
-
-            `This will reset all users' current points to <b>0</b>.\n\n` +
-
-            `⚠️ <b>This action cannot be undone.</b>`,
-
-            {
-                parse_mode: "HTML",
-
-                
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            {
-                                text: "✅ Yes, Reset",
-                                callback_data: "confirm_reset_points",
-                            },
-                            {
-                                text: "❌ No",
-                                callback_data: "cancel_reset_points",
-                            },
-                        ],
-                    ],
-                },
-            }
-        );
-
-    } catch (error) {
-
-        console.error(
-            "❌ Reset confirmation error:",
-            error
-        );
-
-    }
-});
-
-
-// ==========================================
-// CONFIRM RESET POINTS
-// ==========================================
-
-bot.action("confirm_reset_points", async (ctx) => {
-    try {
-        await ctx.answerCbQuery(
-            "🔄 Resetting leaderboard..."
-        );
-
-        const adminId = ctx.from.id;
-
-        // ==========================================
-        // RESET ALL CURRENT POINTS
-        // ==========================================
-
-        const result = await User.updateMany(
-            {
-                points: {
-                    $gt: 0,
-                },
-            },
-            {
-                $set: {
-                    points: 0,
-                },
-            }
-        );
-
-        // ==========================================
-        // SHOW SUCCESS
-        // ==========================================
-
-        await ctx.telegram.editMessageText(
-            adminId,
-            ctx.callbackQuery.message.message_id,
-            undefined,
-
-            `✅ <b>LEADERBOARD RESET SUCCESSFULLY</b>\n\n` +
-
-            `All users' current leaderboard points have been reset to <b>0</b>.\n\n` +
-
-            `👥 Users affected: <b>${result.modifiedCount}</b>\n\n` +
-
-            `🏆 The leaderboard is now empty.`,
-
-            {
-                parse_mode: "HTML",
-
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            {
-                                text: "⚙️ Admin Settings",
-                                callback_data: "back_to_admin_settings",
-                            },
-                        ],
-                    ],
-                },
-            }
-        );
-
-    } catch (error) {
-
-        console.error(
-            "❌ Reset points error:",
-            error
-        );
-
+    bot.action("settings_reset_points", async (ctx) => {
         try {
-            await ctx.answerCbQuery(
-                "❌ Failed to reset leaderboard.",
+            await ctx.answerCbQuery();
+
+            const adminId = ctx.from.id;
+
+            // ==========================================
+            // SHOW CONFIRMATION
+            // ==========================================
+
+            await ctx.telegram.editMessageText(
+                adminId,
+                ctx.callbackQuery.message.message_id,
+                undefined,
+
+                `⚠️ <b>RESET LEADERBOARD</b>\n\n` +
+
+                `Are you sure you want to reset the leaderboard?\n\n` +
+
+                `This will reset all users' current points to <b>0</b>.\n\n` +
+
+                `⚠️ <b>This action cannot be undone.</b>`,
+
                 {
-                    show_alert: true,
+                    parse_mode: "HTML",
+
+
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                {
+                                    text: "✅ Yes, Reset",
+                                    callback_data: "confirm_reset_points",
+                                },
+                                {
+                                    text: "❌ No",
+                                    callback_data: "cancel_reset_points",
+                                },
+                            ],
+                        ],
+                    },
                 }
             );
-        } catch (callbackError) {
-            console.error(callbackError);
+
+        } catch (error) {
+
+            console.error(
+                "❌ Reset confirmation error:",
+                error
+            );
+
         }
-    }
-});
+    });
 
 
-// ==========================================
-// CANCEL RESET POINTS
-// ==========================================
+    // ==========================================
+    // CONFIRM RESET POINTS
+    // ==========================================
 
-bot.action("cancel_reset_points", async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
+    bot.action("confirm_reset_points", async (ctx) => {
+        try {
+            await ctx.answerCbQuery(
+                "🔄 Resetting leaderboard..."
+            );
 
-        const adminId = ctx.from.id;
+            const adminId = ctx.from.id;
 
-        await ctx.telegram.editMessageText(
-            adminId,
-            ctx.callbackQuery.message.message_id,
-            undefined,
+            // ==========================================
+            // RESET ALL CURRENT POINTS
+            // ==========================================
 
-            `⚙️ <b>BLOCKHUB ADMIN SETTINGS</b>\n\n` +
-
-            `Welcome to the BlockHub admin settings.\n\n` +
-
-            `Choose an option below:`,
-
-            {
-                parse_mode: "HTML",
-
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            {
-                                text: "➕ Manage Points",
-                                callback_data: "settings_manage_points",
-                            },
-                        ],
-                        [
-                            {
-                                text: "🔄 Reset Points",
-                                callback_data: "settings_reset_points",
-                            },
-                        ],
-                    ],
+            const result = await User.updateMany(
+                {
+                    points: {
+                        $gt: 0,
+                    },
                 },
-            }
-        );
+                {
+                    $set: {
+                        points: 0,
+                    },
+                }
+            );
 
-    } catch (error) {
+            // ==========================================
+            // SHOW SUCCESS
+            // ==========================================
 
-        console.error(
-            "❌ Cancel reset error:",
-            error
-        );
+            await ctx.telegram.editMessageText(
+                adminId,
+                ctx.callbackQuery.message.message_id,
+                undefined,
 
-    }
-});
+                `✅ <b>LEADERBOARD RESET SUCCESSFULLY</b>\n\n` +
 
+                `All users' current leaderboard points have been reset to <b>0</b>.\n\n` +
 
-// ==========================================
-// BACK TO ADMIN SETTINGS
-// ==========================================
+                `👥 Users affected: <b>${result.modifiedCount}</b>\n\n` +
 
-bot.action("back_to_admin_settings", async (ctx) => {
-    try {
-        await ctx.answerCbQuery();
+                `🏆 The leaderboard is now empty.`,
 
-        const adminId = ctx.from.id;
+                {
+                    parse_mode: "HTML",
 
-        await ctx.telegram.editMessageText(
-            adminId,
-            ctx.callbackQuery.message.message_id,
-            undefined,
-
-            `⚙️ <b>BLOCKHUB ADMIN SETTINGS</b>\n\n` +
-
-            `Welcome to the BlockHub admin settings.\n\n` +
-
-            `Choose an option below:`,
-
-            {
-                parse_mode: "HTML",
-
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            {
-                                text: "➕ Manage Points",
-                                callback_data: "settings_manage_points",
-                            },
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                {
+                                    text: "⚙️ Admin Settings",
+                                    callback_data: "back_to_admin_settings",
+                                },
+                            ],
                         ],
-                        [
-                            {
-                                text: "🔄 Reset Points",
-                                callback_data: "settings_reset_points",
-                            },
-                        ],
-                    ],
-                },
+                    },
+                }
+            );
+
+        } catch (error) {
+
+            console.error(
+                "❌ Reset points error:",
+                error
+            );
+
+            try {
+                await ctx.answerCbQuery(
+                    "❌ Failed to reset leaderboard.",
+                    {
+                        show_alert: true,
+                    }
+                );
+            } catch (callbackError) {
+                console.error(callbackError);
             }
-        );
+        }
+    });
 
-    } catch (error) {
 
-        console.error(
-            "❌ Back to admin settings error:",
-            error
-        );
+    // ==========================================
+    // CANCEL RESET POINTS
+    // ==========================================
 
-    }
-});
+    bot.action("cancel_reset_points", async (ctx) => {
+        try {
+            await ctx.answerCbQuery();
+
+            const adminId = ctx.from.id;
+
+            await ctx.telegram.editMessageText(
+                adminId,
+                ctx.callbackQuery.message.message_id,
+                undefined,
+
+                `⚙️ <b>BLOCKHUB ADMIN SETTINGS</b>\n\n` +
+
+                `Welcome to the BlockHub admin settings.\n\n` +
+
+                `Choose an option below:`,
+
+                {
+                    parse_mode: "HTML",
+
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                {
+                                    text: "➕ Manage Points",
+                                    callback_data: "settings_manage_points",
+                                },
+                            ],
+                            [
+                                {
+                                    text: "🔄 Reset Points",
+                                    callback_data: "settings_reset_points",
+                                },
+                            ],
+                        ],
+                    },
+                }
+            );
+
+        } catch (error) {
+
+            console.error(
+                "❌ Cancel reset error:",
+                error
+            );
+
+        }
+    });
+
+
+    // ==========================================
+    // BACK TO ADMIN SETTINGS
+    // ==========================================
+
+    bot.action("back_to_admin_settings", async (ctx) => {
+        try {
+            await ctx.answerCbQuery();
+
+            const adminId = ctx.from.id;
+
+            await ctx.telegram.editMessageText(
+                adminId,
+                ctx.callbackQuery.message.message_id,
+                undefined,
+
+                `⚙️ <b>BLOCKHUB ADMIN SETTINGS</b>\n\n` +
+
+                `Welcome to the BlockHub admin settings.\n\n` +
+
+                `Choose an option below:`,
+
+                {
+                    parse_mode: "HTML",
+
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                {
+                                    text: "➕ Manage Points",
+                                    callback_data: "settings_manage_points",
+                                },
+                            ],
+                            [
+                                {
+                                    text: "🔄 Reset Points",
+                                    callback_data: "settings_reset_points",
+                                },
+                            ],
+                        ],
+                    },
+                }
+            );
+
+        } catch (error) {
+
+            console.error(
+                "❌ Back to admin settings error:",
+                error
+            );
+
+        }
+    });
     // ==========================================
     // MANAGE POINTS
     // ==========================================
@@ -983,12 +983,14 @@ bot.action("back_to_admin_settings", async (ctx) => {
 
             const users =
                 await User.find({
-                    points: {
-                        $gt: 0,
+                    "telegram.id": {
+                        $exists: true,
+                        $ne: null,
                     },
                 })
                     .sort({
                         points: -1,
+                        fullName: 1,
                     });
 
 
@@ -1472,15 +1474,16 @@ bot.action("back_to_admin_settings", async (ctx) => {
                 async () => {
 
                     try {
-
                         const users =
                             await User.find({
-                                points: {
-                                    $gt: 0,
+                                "telegram.id": {
+                                    $exists: true,
+                                    $ne: null,
                                 },
                             })
                                 .sort({
                                     points: -1,
+                                    fullName: 1,
                                 });
 
 
