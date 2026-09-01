@@ -717,6 +717,244 @@ module.exports = (bot) => {
         }
     );
 
+
+    // ==========================================
+// RESET POINTS — CONFIRMATION
+// ==========================================
+
+bot.action("settings_reset_points", async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+
+        const adminId = ctx.from.id;
+
+        // ==========================================
+        // CHECK ADMIN
+        // ==========================================
+
+        const member = await ctx.telegram.getChatMember(
+            ctx.chat.id,
+            adminId
+        );
+
+        const isAdmin =
+            member.status === "administrator" ||
+            member.status === "creator";
+
+        if (!isAdmin) {
+            return ctx.answerCbQuery(
+                "❌ Only admins can reset the leaderboard.",
+                {
+                    show_alert: true,
+                }
+            );
+        }
+
+        // ==========================================
+        // SHOW CONFIRMATION
+        // ==========================================
+
+        await ctx.telegram.editMessageText(
+            adminId,
+            ctx.callbackQuery.message.message_id,
+            undefined,
+
+            `⚠️ <b>RESET LEADERBOARD</b>\n\n` +
+
+            `Are you sure you want to reset the leaderboard?\n\n` +
+
+            `This will set all users' current points to <b>0</b>.\n\n` +
+
+            `⚠️ <b>This action cannot be undone.</b>`,
+
+            {
+                parse_mode: "HTML",
+
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            {
+                                text: "✅ Yes, Reset",
+                                callback_data: "confirm_reset_points",
+                            },
+                            {
+                                text: "❌ No, Cancel",
+                                callback_data: "cancel_reset_points",
+                            },
+                        ],
+                    ],
+                },
+            }
+        );
+
+    } catch (error) {
+
+        console.error(
+            "❌ Reset points confirmation error:",
+            error
+        );
+
+    }
+});
+
+
+// ==========================================
+// CONFIRM RESET POINTS
+// ==========================================
+
+bot.action("confirm_reset_points", async (ctx) => {
+    try {
+        await ctx.answerCbQuery(
+            "🔄 Resetting leaderboard..."
+        );
+
+        const adminId = ctx.from.id;
+
+        // ==========================================
+        // CHECK ADMIN AGAIN
+        // ==========================================
+
+        const member = await ctx.telegram.getChatMember(
+            ctx.chat.id,
+            adminId
+        );
+
+        const isAdmin =
+            member.status === "administrator" ||
+            member.status === "creator";
+
+        if (!isAdmin) {
+            return ctx.answerCbQuery(
+                "❌ Only admins can reset the leaderboard.",
+                {
+                    show_alert: true,
+                }
+            );
+        }
+
+        // ==========================================
+        // RESET ALL USER POINTS
+        // ==========================================
+
+        const result = await User.updateMany(
+            {
+                points: {
+                    $gt: 0,
+                },
+            },
+            {
+                $set: {
+                    points: 0,
+                },
+            }
+        );
+
+        // ==========================================
+        // SHOW SUCCESS
+        // ==========================================
+
+        await ctx.telegram.editMessageText(
+            adminId,
+            ctx.callbackQuery.message.message_id,
+            undefined,
+
+            `✅ <b>LEADERBOARD RESET SUCCESSFULLY</b>\n\n` +
+
+            `All current leaderboard points have been reset to <b>0</b>.\n\n` +
+
+            `👥 Users affected: <b>${result.modifiedCount}</b>\n\n` +
+
+            `The leaderboard is now empty.`,
+
+            {
+                parse_mode: "HTML",
+
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            {
+                                text: "⚙️ Admin Settings",
+                                callback_data: "settings_manage_points",
+                            },
+                        ],
+                    ],
+                },
+            }
+        );
+
+    } catch (error) {
+
+        console.error(
+            "❌ Reset points error:",
+            error
+        );
+
+        try {
+            await ctx.answerCbQuery(
+                "❌ Failed to reset leaderboard.",
+                {
+                    show_alert: true,
+                }
+            );
+        } catch (callbackError) {
+            console.error(callbackError);
+        }
+    }
+});
+
+
+// ==========================================
+// CANCEL RESET POINTS
+// ==========================================
+
+bot.action("cancel_reset_points", async (ctx) => {
+    try {
+        await ctx.answerCbQuery();
+
+        const adminId = ctx.from.id;
+
+        await ctx.telegram.editMessageText(
+            adminId,
+            ctx.callbackQuery.message.message_id,
+            undefined,
+
+            `⚙️ <b>BLOCKHUB ADMIN SETTINGS</b>\n\n` +
+
+            `Welcome to the BlockHub admin settings.\n\n` +
+
+            `Choose an option below:`,
+
+            {
+                parse_mode: "HTML",
+
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            {
+                                text: "➕ Manage Points",
+                                callback_data: "settings_manage_points",
+                            },
+                        ],
+                        [
+                            {
+                                text: "🔄 Reset Points",
+                                callback_data: "settings_reset_points",
+                            },
+                        ],
+                    ],
+                },
+            }
+        );
+
+    } catch (error) {
+
+        console.error(
+            "❌ Cancel reset error:",
+            error
+        );
+    }
+});
+
     // ==========================================
     // MANAGE POINTS
     // ==========================================
