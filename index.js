@@ -98,11 +98,11 @@ mongoose.connect(process.env.MONGODB_URI)
     .catch(err => console.error('MongoDB connection error:', err));
 
 
-    const telegramBot = require("./services/bots/telegramBot");
+//     const telegramBot = require("./services/bots/telegramBot");
 
-telegramBot.launch();
+// // telegramBot.launch();
 
-console.log("🤖 Telegram bot started");
+// console.log("🤖 Telegram bot started");
 
 
 // ===============================

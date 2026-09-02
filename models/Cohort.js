@@ -44,12 +44,7 @@ const cohortRegistrationSchema = new mongoose.Schema(
         track: {
             type: String,
             required: true,
-            enum: [
-                "Web Development + Vibe Coding",
-                "SQL",
-                "3D Animation",
-                "AI Video & Image Creation",
-            ],
+           
         },
 
         about: {

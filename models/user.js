@@ -72,7 +72,7 @@ const userSchema = new mongoose.Schema({
     emailSent:                  { type: Boolean, default: false },
 
     telegram:                   {
-                                    id: { type: String, default: null, unique: true, sparse: true },
+                                    id: { type: String, unique: true, sparse: true },
                                     username: { type: String, default: null },
                                     firstName: { type: String, default: null },
                                     linkedAt: { type: Date, default: null }
