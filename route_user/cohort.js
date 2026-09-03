@@ -4,7 +4,7 @@ const router = express.Router();
 const User = require("../models/user");
 
 // Change this to wherever your auth middleware lives
-const  CohortRegistration = require("../models/Cohort");
+const CohortRegistration = require("../models/Cohort");
 
 
 router.post("/register", async (req, res) => {
@@ -51,11 +51,7 @@ router.post("/register", async (req, res) => {
             user = await User.create({
                 fullName: fullName.trim(),
                 email: normalizedEmail,
-
                 source: "cohort",
-
-                twitterHandle: null,
-                twitterId: null,
             });
         }
 

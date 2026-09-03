@@ -98,12 +98,16 @@ mongoose.connect(process.env.MONGODB_URI)
     .catch(err => console.error('MongoDB connection error:', err));
 
 
-//     const telegramBot = require("./services/bots/telegramBot");
 
-// // telegramBot.launch();
+if (process.env.NODE_ENV === "production") {
+    const telegramBot = require("./services/bots/telegramBot");
 
-// console.log("🤖 Telegram bot started");
+    telegramBot.launch();
 
+    console.log("🤖 Telegram bot started in production");
+} else {
+    console.log("🤖 Telegram bot disabled in development");
+}
 
 // ===============================
 // Serve static uploads (if needed)

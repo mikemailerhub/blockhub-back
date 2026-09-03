@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
     fullName:                   { type: String },
-    twitterHandle:              { type: String, unique: true,sparse: true,default: null  },
-    twitterId:                  { type: String, unique: true, sparse: true,default: null },
+    twitterHandle:              { type: String, unique: true,sparse: true, },
+    twitterId:                  { type: String, unique: true, sparse: true, },
     email:                      { type: String, default: null },
     profileImage:               { type: String, default: null },
     verified:                   { type: Boolean, default: false },
