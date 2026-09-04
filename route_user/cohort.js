@@ -7,6 +7,227 @@ const User = require("../models/user");
 const CohortRegistration = require("../models/Cohort");
 
 
+// =====================================================
+// GET COHORT STATISTICS
+// GET /user_cohort/stats
+//
+// Supported query params:
+// ?page=1
+// ?limit=10
+// ?search=john
+// ?track=Backend Development
+// =====================================================
+
+router.get("/stats", async (req, res) => {
+    try {
+        let {
+            page = 1,
+            limit = 10,
+            search = "",
+            track = "",
+        } = req.query;
+
+        page = Math.max(parseInt(page) || 1, 1);
+        limit = Math.min(Math.max(parseInt(limit) || 10, 1), 100);
+
+        const skip = (page - 1) * limit;
+
+        // -------------------------------------------------
+        // Base filter
+        // -------------------------------------------------
+
+        const filter = {};
+
+        // -------------------------------------------------
+        // Search
+        // Searches:
+        // - Full name
+        // - Email
+        // - Telegram username
+        // - Country
+        // - Track
+        // -------------------------------------------------
+
+        if (search.trim()) {
+            const searchRegex = new RegExp(search.trim(), "i");
+
+            filter.$or = [
+                { fullName: searchRegex },
+                { email: searchRegex },
+                { telegramUsername: searchRegex },
+                { country: searchRegex },
+                { track: searchRegex },
+            ];
+        }
+
+        // -------------------------------------------------
+        // Track filter
+        // -------------------------------------------------
+
+        if (track.trim()) {
+            filter.track = track.trim();
+        }
+
+        // -------------------------------------------------
+        // Total registrations
+        // -------------------------------------------------
+
+        const total = await CohortRegistration.countDocuments({});
+
+        // -------------------------------------------------
+        // Today's registrations
+        // -------------------------------------------------
+
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+
+        const endOfToday = new Date();
+        endOfToday.setHours(23, 59, 59, 999);
+
+        const today = await CohortRegistration.countDocuments({
+            createdAt: {
+                $gte: startOfToday,
+                $lte: endOfToday,
+            },
+        });
+
+        // -------------------------------------------------
+        // Track/course statistics
+        // -------------------------------------------------
+
+        const trackStats = await CohortRegistration.aggregate([
+            {
+                $match: {
+                    track: {
+                        $exists: true,
+                        $nin: ["", null],
+                    },
+                },
+            },
+            {
+                $group: {
+                    _id: "$track",
+                    count: {
+                        $sum: 1,
+                    },
+                },
+            },
+            {
+                $sort: {
+                    count: -1,
+                },
+            },
+        ]);
+
+        const tracks = trackStats.map((item) => ({
+            name: item._id,
+            count: item.count,
+            percentage:
+                total > 0
+                    ? Number(((item.count / total) * 100).toFixed(1))
+                    : 0,
+        }));
+
+        // -------------------------------------------------
+        // Registered users
+        // -------------------------------------------------
+
+        const registrations = await CohortRegistration.find(filter)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .lean();
+
+        // -------------------------------------------------
+        // Total search results
+        // -------------------------------------------------
+
+        const filteredTotal =
+            await CohortRegistration.countDocuments(filter);
+
+        const totalPages = Math.ceil(filteredTotal / limit);
+
+        // -------------------------------------------------
+        // Most popular course
+        // -------------------------------------------------
+
+        const mostPopularTrack =
+            tracks.length > 0
+                ? tracks[0]
+                : null;
+
+        // -------------------------------------------------
+        // Response
+        // -------------------------------------------------
+
+        return res.status(200).json({
+            success: true,
+
+            data: {
+                overview: {
+                    total,
+                    today,
+                    totalTracks: tracks.length,
+                    mostPopularTrack,
+                },
+
+                tracks,
+
+                registrations,
+
+                pagination: {
+                    page,
+                    limit,
+                    total: filteredTotal,
+                    totalPages,
+                    hasNextPage: page < totalPages,
+                    hasPreviousPage: page > 1,
+                },
+            },
+        });
+    } catch (error) {
+        console.error("❌ Cohort stats error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch cohort statistics",
+            error: error.message,
+        });
+    }
+});
+
+
+// =====================================================
+// GET ALL COHORT TRACKS
+// GET /user_cohort/tracks
+//
+// Useful for the frontend filter dropdown.
+// =====================================================
+
+router.get("/tracks", async (req, res) => {
+    try {
+        const tracks = await CohortRegistration.distinct("track");
+
+        const cleanTracks = tracks
+            .filter(Boolean)
+            .filter((track) => track.trim() !== "")
+            .sort();
+
+        return res.status(200).json({
+            success: true,
+            data: cleanTracks,
+        });
+    } catch (error) {
+        console.error("❌ Cohort tracks error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch cohort tracks",
+            error: error.message,
+        });
+    }
+});
+
 router.post("/register", async (req, res) => {
     try {
         const {
