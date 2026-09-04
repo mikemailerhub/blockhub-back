@@ -150,6 +150,7 @@ app.use('/user_ai', require('./route_user/ai'));
 app.use('/user_project', require('./route_user/project'));
 app.use('/user_campaign', require('./route_user/campaign'));
 app.use('/user_cohort', require('./route_user/cohort'));
+app.use('/user_referral', require('./route_user/referral'));
 
 // Tutor routes
 app.use('/tutor_auth', require('./route_tutor/auth'));

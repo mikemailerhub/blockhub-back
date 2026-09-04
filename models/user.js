@@ -28,6 +28,15 @@ const userSchema = new mongoose.Schema({
                                     totalTasksCompleted:  {type: Number, default: 0}, 
                                 },      
 
+    referralCode:               {
+                                    type: String,
+                                    unique: true,
+                                    sparse: true,
+                                    uppercase: true,
+                                    trim: true,
+                                    index: true,
+                                },  
+
     template_bought:            { type: Boolean, default: false },
     portfolio:                  { type: Boolean, default: false },
     portfolioUrl:               [{ type: String, default: '' }],
