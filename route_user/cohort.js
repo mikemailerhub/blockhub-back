@@ -5,6 +5,7 @@ const User = require("../models/user");
 
 // Change this to wherever your auth middleware lives
 const CohortRegistration = require("../models/Cohort");
+const Referral = require("../models/Referral");
 
 
 // =====================================================
@@ -227,7 +228,6 @@ router.get("/tracks", async (req, res) => {
         });
     }
 });
-
 router.post("/register", async (req, res) => {
     try {
         const {
@@ -238,7 +238,12 @@ router.post("/register", async (req, res) => {
             track,
             about,
             source,
+            referralCode,
         } = req.body;
+
+        // --------------------------------
+        // Validate required fields
+        // --------------------------------
 
         if (
             !fullName ||
@@ -321,6 +326,115 @@ router.post("/register", async (req, res) => {
                 source,
             });
 
+        // =====================================================
+        // REFERRAL SYSTEM
+        // =====================================================
+
+        if (referralCode) {
+            try {
+                // Normalize referral code
+                const normalizedReferralCode =
+                    referralCode.trim().toUpperCase();
+
+                // --------------------------------
+                // Find the person who owns the code
+                // --------------------------------
+
+                const referrer = await User.findOne({
+                    referralCode: normalizedReferralCode,
+                });
+
+                // --------------------------------
+                // Only continue if referral code is valid
+                // --------------------------------
+
+                if (referrer) {
+                    // --------------------------------
+                    // Prevent self-referral
+                    // --------------------------------
+
+                    if (
+                        referrer._id.toString() !==
+                        user._id.toString()
+                    ) {
+                        // --------------------------------
+                        // Check if this user already has
+                        // a referral
+                        // --------------------------------
+
+                        const existingReferral =
+                            await Referral.findOne({
+                                referredUser: user._id,
+                            });
+
+                        // --------------------------------
+                        // Create referral if one doesn't exist
+                        // --------------------------------
+
+                        if (!existingReferral) {
+                            await Referral.create({
+                                referrer: referrer._id,
+
+                                referredUser: user._id,
+
+                                referralCode:
+                                    normalizedReferralCode,
+
+                                cohortRegistration:
+                                    registration._id,
+
+                                cohort: "cohort-1.0",
+
+                                status: "registered",
+
+                                paymentReference: null,
+
+                                paymentAmount: 0,
+
+                                paidAt: null,
+
+                                rewardAmount: 0,
+
+                                rewardStatus: "pending",
+
+                                rewardPaidAt: null,
+                            });
+
+                            console.log(
+                                `✅ Referral created: ${referrer.fullName} referred ${user.fullName}`
+                            );
+                        } else {
+                            console.log(
+                                "ℹ️ User already has a referral."
+                            );
+                        }
+                    } else {
+                        console.log(
+                            "⚠️ Self-referral attempt blocked."
+                        );
+                    }
+                } else {
+                    console.log(
+                        `⚠️ Invalid referral code: ${normalizedReferralCode}`
+                    );
+                }
+            } catch (referralError) {
+                // --------------------------------
+                // Referral failure should NOT cancel
+                // the user's cohort registration
+                // --------------------------------
+
+                console.error(
+                    "❌ Referral creation error:",
+                    referralError
+                );
+            }
+        }
+
+        // --------------------------------
+        // Registration successful
+        // --------------------------------
+
         return res.status(201).json({
             success: true,
 
@@ -335,12 +449,23 @@ router.post("/register", async (req, res) => {
 
             registration,
         });
-
     } catch (error) {
         console.error(
             "Cohort registration error:",
             error
         );
+
+        // --------------------------------
+        // Handle duplicate registration
+        // --------------------------------
+
+        if (error.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                message:
+                    "This email is already registered for Cohort 1.0.",
+            });
+        }
 
         return res.status(500).json({
             success: false,
