@@ -7,6 +7,7 @@ const router = express.Router();
 const User = require("../models/user");
 const Referral = require("../models/Referral");
 const CohortRegistration = require("../models/Cohort");
+const  requireAdmin = require("../middlewave/adminAuth");
 
 
 // ============================================================
@@ -739,6 +740,589 @@ router.get("/", async (req, res) => {
         });
     }
 });
+
+
+// =====================================================
+// ADMIN REFERRAL OVERVIEW
+//
+// GET /user_cohort/admin/referrals
+//
+// Query:
+// ?page=1
+// ?limit=20
+// ?search=daniel
+// ?status=paid
+// ?cohort=cohort-1.0
+// =====================================================
+
+router.get(
+    "/admin/referrals",
+    requireAdmin,
+    async (req, res) => {
+        try {
+            let {
+                page = 1,
+                limit = 20,
+                search = "",
+                status = "",
+                cohort = "cohort-1.0",
+            } = req.query;
+
+            page = Math.max(
+                parseInt(page) || 1,
+                1
+            );
+
+            limit = Math.min(
+                Math.max(
+                    parseInt(limit) || 20,
+                    1
+                ),
+                100
+            );
+
+            const skip = (page - 1) * limit;
+
+            // ---------------------------------------------
+            // Base match
+            // ---------------------------------------------
+
+            const match = {
+                cohort,
+            };
+
+            if (
+                status &&
+                [
+                    "registered",
+                    "paid",
+                    "rewarded",
+                    "cancelled",
+                ].includes(status)
+            ) {
+                match.status = status;
+            }
+
+            // ---------------------------------------------
+            // Build referrer search
+            // ---------------------------------------------
+
+            const searchRegex = search.trim()
+                ? new RegExp(search.trim(), "i")
+                : null;
+
+            // ---------------------------------------------
+            // Get grouped referrers
+            // ---------------------------------------------
+
+            const grouped = await Referral.aggregate([
+                {
+                    $match: match,
+                },
+
+                {
+                    $group: {
+                        _id: "$referrer",
+
+                        referralCode: {
+                            $first: "$referralCode",
+                        },
+
+                        totalReferrals: {
+                            $sum: 1,
+                        },
+
+                        registeredReferrals: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $eq: [
+                                            "$status",
+                                            "registered",
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        },
+
+                        paidReferrals: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $in: [
+                                            "$status",
+                                            [
+                                                "paid",
+                                                "rewarded",
+                                            ],
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        },
+
+                        rewardedReferrals: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $eq: [
+                                            "$status",
+                                            "rewarded",
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        },
+
+                        cancelledReferrals: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $eq: [
+                                            "$status",
+                                            "cancelled",
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        },
+
+                        rewardsGenerated: {
+                            $sum: {
+                                $ifNull: [
+                                    "$rewardAmount",
+                                    0,
+                                ],
+                            },
+                        },
+
+                        rewardsPaid: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $eq: [
+                                            "$rewardStatus",
+                                            "paid",
+                                        ],
+                                    },
+                                    {
+                                        $ifNull: [
+                                            "$rewardAmount",
+                                            0,
+                                        ],
+                                    },
+                                    0,
+                                ],
+                            },
+                        },
+
+                        lastReferralAt: {
+                            $max: "$createdAt",
+                        },
+                    },
+                },
+
+                // -----------------------------------------
+                // Join referrer
+                // -----------------------------------------
+
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "_id",
+                        foreignField: "_id",
+                        as: "referrer",
+                    },
+                },
+
+                {
+                    $unwind: {
+                        path: "$referrer",
+                        preserveNullAndEmptyArrays: true,
+                    },
+                },
+
+                // -----------------------------------------
+                // Search referrer
+                // -----------------------------------------
+
+                ...(searchRegex
+                    ? [
+                          {
+                              $match: {
+                                  $or: [
+                                      {
+                                          "referrer.fullName":
+                                              searchRegex,
+                                      },
+                                      {
+                                          "referrer.email":
+                                              searchRegex,
+                                      },
+                                      {
+                                          referralCode:
+                                              searchRegex,
+                                      },
+                                  ],
+                              },
+                          },
+                      ]
+                    : []),
+
+                // -----------------------------------------
+                // Sort by most referrals
+                // -----------------------------------------
+
+                {
+                    $sort: {
+                        totalReferrals: -1,
+                        lastReferralAt: -1,
+                    },
+                },
+
+                // -----------------------------------------
+                // Pagination
+                // -----------------------------------------
+
+                {
+                    $facet: {
+                        metadata: [
+                            {
+                                $count: "total",
+                            },
+                        ],
+
+                        data: [
+                            {
+                                $skip: skip,
+                            },
+                            {
+                                $limit: limit,
+                            },
+                        ],
+                    },
+                },
+            ]);
+
+            const result = grouped[0] || {
+                metadata: [],
+                data: [],
+            };
+
+            const totalReferrers =
+                result.metadata[0]?.total || 0;
+
+            // ---------------------------------------------
+            // Global statistics
+            // ---------------------------------------------
+
+            const globalStats =
+                await Referral.aggregate([
+                    {
+                        $match: {
+                            cohort,
+                        },
+                    },
+
+                    {
+                        $group: {
+                            _id: null,
+
+                            totalReferrals: {
+                                $sum: 1,
+                            },
+
+                            registeredReferrals: {
+                                $sum: {
+                                    $cond: [
+                                        {
+                                            $eq: [
+                                                "$status",
+                                                "registered",
+                                            ],
+                                        },
+                                        1,
+                                        0,
+                                    ],
+                                },
+                            },
+
+                            paidReferrals: {
+                                $sum: {
+                                    $cond: [
+                                        {
+                                            $in: [
+                                                "$status",
+                                                [
+                                                    "paid",
+                                                    "rewarded",
+                                                ],
+                                            ],
+                                        },
+                                        1,
+                                        0,
+                                    ],
+                                },
+                            },
+
+                            rewardedReferrals: {
+                                $sum: {
+                                    $cond: [
+                                        {
+                                            $eq: [
+                                                "$status",
+                                                "rewarded",
+                                            ],
+                                        },
+                                        1,
+                                        0,
+                                    ],
+                                },
+                            },
+
+                            cancelledReferrals: {
+                                $sum: {
+                                    $cond: [
+                                        {
+                                            $eq: [
+                                                "$status",
+                                                "cancelled",
+                                            ],
+                                        },
+                                        1,
+                                        0,
+                                    ],
+                                },
+                            },
+
+                            rewardsGenerated: {
+                                $sum: {
+                                    $ifNull: [
+                                        "$rewardAmount",
+                                        0,
+                                    ],
+                                },
+                            },
+
+                            rewardsPaid: {
+                                $sum: {
+                                    $cond: [
+                                        {
+                                            $eq: [
+                                                "$rewardStatus",
+                                                "paid",
+                                            ],
+                                        },
+                                        {
+                                            $ifNull: [
+                                                "$rewardAmount",
+                                                0,
+                                            ],
+                                        },
+                                        0,
+                                    ],
+                                },
+                            },
+
+                            rewardsPending: {
+                                $sum: {
+                                    $cond: [
+                                        {
+                                            $in: [
+                                                "$rewardStatus",
+                                                [
+                                                    "pending",
+                                                    "approved",
+                                                ],
+                                            ],
+                                        },
+                                        {
+                                            $ifNull: [
+                                                "$rewardAmount",
+                                                0,
+                                            ],
+                                        },
+                                        0,
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                ]);
+
+            const stats =
+                globalStats[0] || {
+                    totalReferrals: 0,
+                    registeredReferrals: 0,
+                    paidReferrals: 0,
+                    rewardedReferrals: 0,
+                    cancelledReferrals: 0,
+                    rewardsGenerated: 0,
+                    rewardsPaid: 0,
+                    rewardsPending: 0,
+                };
+
+            return res.status(200).json({
+                success: true,
+
+                data: {
+                    stats,
+
+                    referrers: result.data,
+
+                    pagination: {
+                        page,
+                        limit,
+                        total: totalReferrers,
+                        totalPages: Math.ceil(
+                            totalReferrers / limit
+                        ),
+                        hasNextPage:
+                            page <
+                            Math.ceil(
+                                totalReferrers / limit
+                            ),
+                        hasPreviousPage:
+                            page > 1,
+                    },
+                },
+            });
+        } catch (error) {
+            console.error(
+                "❌ Admin referral overview error:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Failed to load referral overview.",
+                error: error.message,
+            });
+        }
+    }
+);
+
+// =====================================================
+// ADMIN REFERRER DETAILS
+//
+// GET /user_cohort/admin/referrals/:referrerId
+// =====================================================
+
+router.get(
+    "/admin/referrals/:referrerId",
+    requireAdmin,
+    async (req, res) => {
+        try {
+            const { referrerId } = req.params;
+
+            const referrer = await User.findById(
+                referrerId
+            ).select(
+                "fullName email profileImage referralCode twitterHandle createdAt"
+            );
+
+            if (!referrer) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Referrer not found.",
+                });
+            }
+
+            const referrals =
+                await Referral.find({
+                    referrer: referrerId,
+                    cohort: "cohort-1.0",
+                })
+                    .populate(
+                        "referredUser",
+                        "fullName email profileImage twitterHandle"
+                    )
+                    .populate(
+                        "cohortRegistration",
+                        "fullName email country track about status registeredAt"
+                    )
+                    .sort({
+                        createdAt: -1,
+                    })
+                    .lean();
+
+            const summary = {
+                total: referrals.length,
+
+                registered: referrals.filter(
+                    (item) =>
+                        item.status === "registered"
+                ).length,
+
+                paid: referrals.filter(
+                    (item) =>
+                        item.status === "paid" ||
+                        item.status === "rewarded"
+                ).length,
+
+                rewarded: referrals.filter(
+                    (item) =>
+                        item.status === "rewarded"
+                ).length,
+
+                cancelled: referrals.filter(
+                    (item) =>
+                        item.status === "cancelled"
+                ).length,
+
+                rewardsGenerated:
+                    referrals.reduce(
+                        (total, item) =>
+                            total +
+                            (item.rewardAmount || 0),
+                        0
+                    ),
+
+                rewardsPaid:
+                    referrals.reduce(
+                        (total, item) =>
+                            item.rewardStatus === "paid"
+                                ? total +
+                                  (item.rewardAmount || 0)
+                                : total,
+                        0
+                    ),
+            };
+
+            return res.status(200).json({
+                success: true,
+
+                data: {
+                    referrer,
+                    summary,
+                    referrals,
+                },
+            });
+        } catch (error) {
+            console.error(
+                "❌ Admin referrer details error:",
+                error
+            );
+
+            return res.status(500).json({
+                success: false,
+                message:
+                    "Failed to load referrer details.",
+                error: error.message,
+            });
+        }
+    }
+);
+
 
 
 module.exports = router;

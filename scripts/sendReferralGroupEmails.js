@@ -39,7 +39,7 @@ dns.setDefaultResultOrder("ipv4first");
 
 // true  = ONLY test email receives the email
 // false = real referred users receive the email
-const TEST_MODE = true;
+const TEST_MODE = false;
 
 // ============================================
 // TEST EMAIL
@@ -70,7 +70,7 @@ const COHORT = "cohort-1.0";
 //
 // ============================================
 
-const REFERRER_ID = "689437850a216fc5210fbaa2";
+const REFERRER_ID = "68a489b2cce805962c7d26af";
 
 // If you prefer referral code instead,
 // put the code here and set REFERRER_ID = null.
