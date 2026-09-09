@@ -46,7 +46,8 @@ const allowedOrigins = [
     'https://dashboard.blockhubglobal.xyz',
     'https://blockhubglobal.xyz',
     'https://hk-launch-timecount.netlify.app',
-    'http://172.20.10.4:5173/'
+    'http://172.20.10.4:5173/',
+    'http://172.20.10.4:5173'
 ];
 
 
@@ -151,6 +152,7 @@ app.use('/user_project', require('./route_user/project'));
 app.use('/user_campaign', require('./route_user/campaign'));
 app.use('/user_cohort', require('./route_user/cohort'));
 app.use('/user_referral', require('./route_user/referral'));
+app.use('/user_userCohort', require('./route_user/userCohort'));
 
 // Tutor routes
 app.use('/tutor_auth', require('./route_tutor/auth'));

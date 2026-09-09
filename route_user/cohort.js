@@ -6,6 +6,8 @@ const User = require("../models/user");
 // Change this to wherever your auth middleware lives
 const CohortRegistration = require("../models/Cohort");
 const Referral = require("../models/Referral");
+const createCohortToken = require("../utils/cohortToken");
+const { COHORT_COOKIE_NAME } = require("../middlewave/cohortAuth");
 
 
 // =====================================================
@@ -228,6 +230,8 @@ router.get("/tracks", async (req, res) => {
         });
     }
 });
+
+
 router.post("/register", async (req, res) => {
     try {
         const {
@@ -239,6 +243,7 @@ router.post("/register", async (req, res) => {
             about,
             source,
             referralCode,
+            group,
         } = req.body;
 
         // --------------------------------
@@ -292,10 +297,57 @@ router.post("/register", async (req, res) => {
             });
 
         if (existingRegistration) {
-            return res.status(409).json({
-                success: false,
+            // ==========================================
+            // User is already registered.
+            // Give them a fresh cohort dashboard cookie.
+            // ==========================================
+
+            const cohortToken = createCohortToken({
+                userId: user._id,
+                registrationId: existingRegistration._id,
+                cohort: "cohort-1.0",
+            });
+
+
+
+
+            res.cookie(
+                COHORT_COOKIE_NAME,
+                cohortToken,
+                {
+                    httpOnly: true,
+
+                    secure:
+                        process.env.NODE_ENV === "production",
+
+                    sameSite:
+                        process.env.NODE_ENV === "production"
+                            ? "none"
+                            : "lax",
+
+                    maxAge:
+                        365 *
+                        24 *
+                        60 *
+                        60 *
+                        1000,
+
+                    path: "/",
+                }
+            );
+
+            return res.status(200).json({
+                success: true,
+
                 message:
-                    "This email is already registered for Cohort 1.0.",
+                    "You are already registered for Cohort 1.0. Your dashboard access has been restored.",
+
+                user: {
+                    id: user._id,
+                    fullName: user.fullName,
+                    email: user.email,
+                },
+
                 registration: existingRegistration,
             });
         }
@@ -332,7 +384,10 @@ router.post("/register", async (req, res) => {
 
         if (referralCode) {
             try {
+                // --------------------------------
                 // Normalize referral code
+                // --------------------------------
+
                 const normalizedReferralCode =
                     referralCode.trim().toUpperCase();
 
@@ -431,6 +486,45 @@ router.post("/register", async (req, res) => {
             }
         }
 
+        // =====================================================
+        // CREATE COHORT DASHBOARD TOKEN
+        // =====================================================
+
+        const cohortToken = createCohortToken({
+            userId: user._id,
+            registrationId: registration._id,
+            cohort: "cohort-1.0",
+        });
+
+        // =====================================================
+        // STORE TOKEN IN HTTPONLY COOKIE
+        // =====================================================
+
+        res.cookie(
+            COHORT_COOKIE_NAME,
+            cohortToken,
+            {
+                httpOnly: true,
+
+                secure:
+                    process.env.NODE_ENV === "production",
+
+                sameSite:
+                    process.env.NODE_ENV === "production"
+                        ? "none"
+                        : "lax",
+
+                maxAge:
+                    30 *
+                    24 *
+                    60 *
+                    60 *
+                    1000,
+
+                path: "/",
+            }
+        );
+
         // --------------------------------
         // Registration successful
         // --------------------------------
@@ -443,12 +537,15 @@ router.post("/register", async (req, res) => {
 
             user: {
                 id: user._id,
+
                 fullName: user.fullName,
+
                 email: user.email,
             },
 
             registration,
         });
+
     } catch (error) {
         console.error(
             "Cohort registration error:",
@@ -462,6 +559,7 @@ router.post("/register", async (req, res) => {
         if (error.code === 11000) {
             return res.status(409).json({
                 success: false,
+
                 message:
                     "This email is already registered for Cohort 1.0.",
             });
@@ -469,6 +567,7 @@ router.post("/register", async (req, res) => {
 
         return res.status(500).json({
             success: false,
+
             message:
                 "Something went wrong during registration.",
         });
