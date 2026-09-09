@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 
 const router = express.Router();
 
-const User = require("../models/User");
+const User = require("../models/user");
 const CohortClass = require("../models/CohortClass");
 const CohortRegistration = require("../models/Cohort");
 const CohortAccessToken = require("../models/CohortAccessToken");
