@@ -199,6 +199,176 @@ router.get("/stats", async (req, res) => {
     }
 });
 
+router.post("/login", async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // ---------------------------------------------
+        // Validate input
+        // ---------------------------------------------
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: "Please enter your email and password.",
+            });
+        }
+
+        // ---------------------------------------------
+        // Normalize email
+        // ---------------------------------------------
+        const normalizedEmail = email.trim().toLowerCase();
+
+        const cleanPassword = password.trim().toUpperCase();
+
+        // ---------------------------------------------
+        // Find BlockHub user
+        // ---------------------------------------------
+        const user = await User.findOne({
+            email: normalizedEmail,
+        });
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message:
+                    "No BlockHub account was found with this email.",
+            });
+        }
+
+        // ---------------------------------------------
+        // Find Cohort 1.0 registration
+        // ---------------------------------------------
+        const registration =
+            await CohortRegistration.findOne({
+                user: user._id,
+                cohort: "cohort-1.0",
+            });
+
+        if (!registration) {
+            return res.status(403).json({
+                success: false,
+                message:
+                    "You are not registered for BlockHub Cohort 1.0.",
+            });
+        }
+
+        // ---------------------------------------------
+        // Check registration status
+        // ---------------------------------------------
+        if (
+            registration.status === "rejected"
+        ) {
+            return res.status(403).json({
+                success: false,
+                message:
+                    "Your Cohort 1.0 registration has been rejected.",
+            });
+        }
+
+        // ---------------------------------------------
+        // Generate expected temporary password
+        //
+        // Take the part before @
+        //
+        // daniel.success@gmail.com
+        //       ↓
+        // daniel.success
+        //       ↓
+        // DANIELS
+        // ---------------------------------------------
+        const emailUsername =
+            normalizedEmail.split("@")[0];
+
+        const expectedPassword = emailUsername
+            .replace(/[^a-zA-Z0-9]/g, "")
+            .slice(0, 7)
+            .toUpperCase();
+
+        // ---------------------------------------------
+        // Validate password
+        // ---------------------------------------------
+        if (cleanPassword !== expectedPassword) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password.",
+            });
+        }
+
+        // ---------------------------------------------
+        // Create Cohort Dashboard Token
+        // ---------------------------------------------
+        const cohortToken = createCohortToken({
+            userId: user._id,
+            registrationId: registration._id,
+            cohort: "cohort-1.0",
+        });
+
+        // ---------------------------------------------
+        // Store dashboard token in HttpOnly cookie
+        // ---------------------------------------------
+        res.cookie(
+            COHORT_COOKIE_NAME,
+            cohortToken,
+            {
+                httpOnly: true,
+
+                secure:
+                    process.env.NODE_ENV ===
+                    "production",
+
+                sameSite:
+                    process.env.NODE_ENV ===
+                    "production"
+                        ? "none"
+                        : "lax",
+
+                maxAge:
+                    365 *
+                    24 *
+                    60 *
+                    60 *
+                    1000,
+
+                path: "/",
+            }
+        );
+
+        // ---------------------------------------------
+        // Login successful
+        // ---------------------------------------------
+        return res.status(200).json({
+            success: true,
+            message:
+                "Login successful. Redirecting to your Cohort dashboard.",
+
+            user: {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+            },
+
+            registration: {
+                id: registration._id,
+                cohort: registration.cohort,
+                track: registration.track,
+                status: registration.status,
+            },
+        });
+    } catch (error) {
+        console.error(
+            "❌ Cohort login error:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message:
+                "Something went wrong during login.",
+        });
+    }
+});
+
+
 
 // =====================================================
 // GET ALL COHORT TRACKS
