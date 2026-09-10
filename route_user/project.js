@@ -4,6 +4,7 @@ const auth = require("../middlewave/auth");
 const Project = require("../models/project");
 const User = require("../models/user");
 const Campaign = require("../models/Campaign");
+const CampaignTask = require("../models/CampaignTask");
 
 router.post("/create", auth, async (req, res) => {
     try {
@@ -188,14 +189,28 @@ router.get("/:slug/campaigns", auth, async (req, res) => {
 
         const campaigns = await Campaign.find({
             project: project._id,
-        })
-        .sort({
+        }).sort({
             createdAt: -1,
-        });
+        }).lean();
+
+        const campaignIds = campaigns.map(campaign => campaign._id);
+
+        const tasks = await CampaignTask.find({
+            campaign: { $in: campaignIds },
+        }).sort({
+            order: 1,
+        }).lean();
+
+        const campaignsWithTasks = campaigns.map(campaign => ({
+            ...campaign,
+            tasks: tasks.filter(
+                task => task.campaign.toString() === campaign._id.toString()
+            ),
+        }));
 
         return res.status(200).json({
             success: true,
-            campaigns,
+            campaigns: campaignsWithTasks,
         });
 
     } catch (err) {
