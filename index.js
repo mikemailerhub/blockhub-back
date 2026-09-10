@@ -158,6 +158,7 @@ app.use('/user_userCohort', require('./route_user/userCohort'));
 app.use('/tutor_auth', require('./route_tutor/auth'));
 app.use('/tutor_course', require('./route_tutor/course'));
 app.use('/tutor_dashboard', require('./route_tutor/dashboard'));
+app.use('/tutor_cohort', require('./route_tutor/cohort'));
 
 
 // Tutor routes
@@ -188,7 +189,7 @@ const streamifier = require('streamifier');
 cloudinary.config({
     cloud_name: process.env.CLOUD_NAME,
     api_key: process.env.API_KEY,
-    api_secret: process.env.API_SECREaT
+    api_secret: process.env.API_SECRET
 });
 
 // Memory storage for Multer

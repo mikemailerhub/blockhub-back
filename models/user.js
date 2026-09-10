@@ -77,6 +77,9 @@ const userSchema = new mongoose.Schema({
     createdAt:                  { type: Date, default: Date.now },
     savedJobs:                  [{ type: mongoose.Schema.Types.ObjectId, ref: 'jobs' }],
     appliedJobs:                [{ type: mongoose.Schema.Types.ObjectId, ref: 'jobs' }],
+    isCohortTutor:              { type: Boolean, default: false, },
+
+cohortTutorProfile:             { type: mongoose.Schema.Types.ObjectId, ref: "CohortTutor", default: null, },
 
     emailSent:                  { type: Boolean, default: false },
 

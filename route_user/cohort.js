@@ -8,6 +8,9 @@ const CohortRegistration = require("../models/Cohort");
 const Referral = require("../models/Referral");
 const createCohortToken = require("../utils/cohortToken");
 const { COHORT_COOKIE_NAME } = require("../middlewave/cohortAuth");
+const requireAdmin = require("../middlewave/adminAuth");
+const CohortTutor = require("../models/CohortTutor");
+const CohortClass = require("../models/CohortClass");
 
 
 // =====================================================
@@ -318,7 +321,7 @@ router.post("/login", async (req, res) => {
 
                 sameSite:
                     process.env.NODE_ENV ===
-                    "production"
+                        "production"
                         ? "none"
                         : "lax",
 
@@ -776,6 +779,350 @@ router.get("/registrations", async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Failed to fetch cohort registrations.",
+        });
+    }
+});
+
+
+
+// =====================================================
+// MAKE USER A COHORT TUTOR
+// =====================================================
+
+router.post("/cohort-tutors", requireAdmin, async (req, res) => {
+    try {
+        const {
+            email,
+            userId,
+            cohort = "cohort-1.0",
+            track,
+            bio = "",
+            skills = [],
+        } = req.body;
+
+        // -------------------------------------------------
+        // 1. Validate input
+        // -------------------------------------------------
+
+        if (!email && !userId) {
+            return res.status(400).json({
+                success: false,
+                message: "Provide either userId or email.",
+            });
+        }
+
+        if (!track) {
+            return res.status(400).json({
+                success: false,
+                message: "Track is required.",
+            });
+        }
+
+        // -------------------------------------------------
+        // 2. Find existing user
+        // -------------------------------------------------
+
+        const user = userId
+            ? await User.findById(userId)
+            : await User.findOne({
+                email: email.toLowerCase().trim(),
+            });
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found.",
+            });
+        }
+
+        // -------------------------------------------------
+        // 3. Check if already a cohort tutor
+        // -------------------------------------------------
+
+        const existingTutor = await CohortTutor.findOne({
+            user: user._id,
+            cohort,
+        });
+
+        if (existingTutor) {
+            return res.status(409).json({
+                success: false,
+                message: "This user is already a cohort tutor for this cohort.",
+                data: {
+                    tutor: existingTutor,
+                },
+            });
+        }
+
+        // -------------------------------------------------
+        // 4. Create tutor code
+        // -------------------------------------------------
+
+        const tutorCode = `BHT-${Math.random()
+            .toString(36)
+            .substring(2, 8)
+            .toUpperCase()}`;
+
+        // -------------------------------------------------
+        // 5. Create CohortTutor profile
+        // -------------------------------------------------
+
+        const cohortTutor = await CohortTutor.create({
+            user: user._id,
+            cohort,
+            track,
+            bio,
+            skills: Array.isArray(skills) ? skills : [],
+            tutorCode,
+            status: "active",
+            createdBy: req.adminUser._id,
+        });
+
+        // -------------------------------------------------
+        // 6. Update User
+        // -------------------------------------------------
+
+        user.isCohortTutor = true;
+        user.cohortTutorProfile = cohortTutor._id;
+
+        await user.save();
+
+        // -------------------------------------------------
+        // 7. Return result
+        // -------------------------------------------------
+
+        return res.status(201).json({
+            success: true,
+            message: "User successfully made a cohort tutor.",
+            data: {
+                tutor: cohortTutor,
+                user: {
+                    id: user._id,
+                    fullName: user.fullName,
+                    email: user.email,
+                    isCohortTutor: user.isCohortTutor,
+                    cohortTutorProfile: user.cohortTutorProfile,
+                },
+            },
+        });
+    } catch (error) {
+        console.error("❌ Make cohort tutor error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to make user a cohort tutor.",
+        });
+    }
+});
+
+
+// ============================================================
+// GET ALL COHORT TUTORS
+// GET /admin/cohort-tutors
+// ============================================================
+router.get("/cohort-tutors", requireAdmin, async (req, res) => {
+    try {
+        const {
+            cohort = "cohort-1.0",
+            status = "",
+            track = "",
+            search = "",
+        } = req.query;
+
+        // --------------------------------------------------------
+        // Build tutor query
+        // --------------------------------------------------------
+        const tutorQuery = {
+            cohort: cohort.trim(),
+        };
+
+        if (status) {
+            tutorQuery.status = status.trim();
+        }
+
+        if (track) {
+            tutorQuery.track = track.trim();
+        }
+
+        // --------------------------------------------------------
+        // Get tutors and populate their existing User account
+        // --------------------------------------------------------
+        let tutors = await CohortTutor.find(tutorQuery)
+            .populate("user", "_id fullName email profileImage")
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // --------------------------------------------------------
+        // Search
+        // --------------------------------------------------------
+        if (search && search.trim()) {
+            const searchText = search.trim().toLowerCase();
+
+            tutors = tutors.filter((tutor) => {
+                const fullName = tutor.user?.fullName || "";
+                const email = tutor.user?.email || "";
+                const tutorCode = tutor.tutorCode || "";
+                const tutorTrack = tutor.track || "";
+                const tutorCohort = tutor.cohort || "";
+                const tutorLevel = tutor.tutorLevel || "";
+
+                const searchableText = `
+          ${fullName}
+          ${email}
+          ${tutorCode}
+          ${tutorTrack}
+          ${tutorCohort}
+          ${tutorLevel}
+        `.toLowerCase();
+
+                return searchableText.includes(searchText);
+            });
+        }
+
+        // --------------------------------------------------------
+        // Get ALL tutors for overall statistics
+        // --------------------------------------------------------
+        const allTutors = await CohortTutor.find({
+            cohort: cohort.trim(),
+        }).lean();
+
+        const totalTutors = allTutors.length;
+
+        const activeTutors = allTutors.filter(
+            (tutor) => tutor.status === "active"
+        ).length;
+
+        const inactiveTutors = allTutors.filter(
+            (tutor) => tutor.status === "inactive"
+        ).length;
+
+        const suspendedTutors = allTutors.filter(
+            (tutor) => tutor.status === "suspended"
+        ).length;
+
+        // --------------------------------------------------------
+        // Get total students in this cohort
+        // --------------------------------------------------------
+        const totalStudents = await CohortRegistration.countDocuments({
+            cohort: cohort.trim(),
+        });
+
+        // --------------------------------------------------------
+        // Get total classes in this cohort
+        // --------------------------------------------------------
+        const totalClasses = await CohortClass.countDocuments({
+            cohort: cohort.trim(),
+            status: { $ne: "cancelled" },
+        });
+
+        // --------------------------------------------------------
+        // Get upcoming classes
+        // --------------------------------------------------------
+        const now = new Date();
+
+        const upcomingClasses = await CohortClass.countDocuments({
+            cohort: cohort.trim(),
+            status: { $in: ["scheduled", "ongoing"] },
+            startDate: { $gte: now },
+        });
+
+        // --------------------------------------------------------
+        // Add statistics to each tutor
+        // --------------------------------------------------------
+        const tutorsWithStats = await Promise.all(
+            tutors.map(async (tutor) => {
+                const userId = tutor.user?._id || tutor.user;
+
+                // No user attached
+                if (!userId) {
+                    return {
+                        ...tutor,
+                        stats: {
+                            totalStudents: 0,
+                            totalClasses: 0,
+                            upcomingClasses: 0,
+                            completedClasses: 0,
+                        },
+                    };
+                }
+
+                // ----------------------------------------------------
+                // Students
+                //
+                // Students are currently linked to a track through
+                // CohortRegistration, not directly to a tutor.
+                // ----------------------------------------------------
+                const tutorStudents = await CohortRegistration.countDocuments({
+                    cohort: tutor.cohort,
+                    track: tutor.track,
+                });
+
+                // ----------------------------------------------------
+                // Total classes assigned to this tutor
+                // ----------------------------------------------------
+                const tutorTotalClasses = await CohortClass.countDocuments({
+                    cohort: tutor.cohort,
+                    tutor: userId,
+                    status: { $ne: "cancelled" },
+                });
+
+                // ----------------------------------------------------
+                // Upcoming classes assigned to this tutor
+                // ----------------------------------------------------
+                const tutorUpcomingClasses = await CohortClass.countDocuments({
+                    cohort: tutor.cohort,
+                    tutor: userId,
+                    status: { $in: ["scheduled", "ongoing"] },
+                    startDate: { $gte: now },
+                });
+
+                // ----------------------------------------------------
+                // Completed classes
+                // ----------------------------------------------------
+                const tutorCompletedClasses = await CohortClass.countDocuments({
+                    cohort: tutor.cohort,
+                    tutor: userId,
+                    status: "completed",
+                });
+
+                return {
+                    ...tutor,
+
+                    stats: {
+                        totalStudents: tutorStudents,
+                        totalClasses: tutorTotalClasses,
+                        upcomingClasses: tutorUpcomingClasses,
+                        completedClasses: tutorCompletedClasses,
+                    },
+                };
+            })
+        );
+
+        // --------------------------------------------------------
+        // Response
+        // --------------------------------------------------------
+        return res.status(200).json({
+            success: true,
+            data: {
+                stats: {
+                    totalTutors,
+                    activeTutors,
+                    inactiveTutors,
+                    suspendedTutors,
+                    totalStudents,
+                    totalClasses,
+                    upcomingClasses,
+                },
+
+                tutors: tutorsWithStats,
+            },
+        });
+    } catch (error) {
+        console.error("❌ Get cohort tutors error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to fetch cohort tutors.",
         });
     }
 });
