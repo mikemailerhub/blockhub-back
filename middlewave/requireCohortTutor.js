@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+const User = require("../models/user");
 const CohortTutor = require("../models/CohortTutor");
 
 const requireCohortTutor = async (req, res, next) => {
