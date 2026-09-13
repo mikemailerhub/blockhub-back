@@ -202,6 +202,67 @@ router.get("/stats", async (req, res) => {
     }
 });
 
+
+router.post("/admin/fix-3d-track",  async (req, res) => {
+    try {
+        // Find all registrations whose track starts with "3D"
+        const oldTracks = await CohortRegistration.find({
+            track: {
+                $regex: /^3D/i,
+            },
+        }).select("_id track");
+
+        if (oldTracks.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: "No old 3D tracks found. Database is already clean.",
+                matched: 0,
+                modified: 0,
+            });
+        }
+
+        // Update every matching registration
+        const result = await CohortRegistration.updateMany(
+            {
+                track: {
+                    $regex: /^3D/i,
+                },
+            },
+            [
+                {
+                    $set: {
+                        track: {
+                            $replaceOne: {
+                                input: "$track",
+                                find: "3D",
+                                replacement: "2D",
+                            },
+                        },
+                        updatedAt: new Date(),
+                    },
+                },
+            ]
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: "All old 3D tracks have been changed to 2D.",
+            matched: result.matchedCount,
+            modified: result.modifiedCount,
+            oldTracks,
+        });
+    } catch (error) {
+        console.error("❌ Track migration error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to migrate old 3D tracks",
+            error: error.message,
+        });
+    }
+});
+
+
 router.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
